@@ -20,8 +20,12 @@
             <select id="chapter-select"></select>
             <span class="colon">:</span>
             <select id="verse-select"></select>
-            
             <button id="go-btn" class="go-btn">이동</button>
+        </div>
+
+        <div class="search-box">
+            <input type="text" id="search-input" placeholder="단어 검색...">
+            <button id="search-btn" class="nav-btn">🔍</button>
         </div>
 
         <button id="next-btn" class="nav-btn">다음 장 ▶</button>
@@ -54,6 +58,15 @@
             <span id="modal-close-button">&times;</span>
             <h2>단어 분석</h2>
             <div id="modal-body"></div>
+        </div>
+    </div>
+
+    <div id="search-result-modal" style="display: none;">
+        <div id="search-modal-content">
+            <span id="search-close-button">&times;</span>
+            <h2>검색 결과</h2>
+            <div id="search-results-body">
+                </div>
         </div>
     </div>
 
