@@ -12,11 +12,46 @@ header {
     text-align: center;
 }
 
+/* [NEW] 내비게이션 바 스타일 */
+.nav-container {
+    background-color: #e9ecef;
+    padding: 10px 20px;
+    display: flex;
+    justify-content: space-between; /* 양끝 정렬 */
+    align-items: center;
+    border-bottom: 1px solid #ddd;
+    margin-bottom: 1rem;
+}
+.nav-inputs {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+.nav-inputs input {
+    padding: 5px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    text-align: center;
+}
+#book-input { width: 120px; }
+#chapter-input, #verse-input { width: 60px; }
+.colon { font-weight: bold; }
+
+.nav-btn {
+    background-color: #6c757d; color: white; border: none; padding: 5px 15px;
+    cursor: pointer; border-radius: 4px;
+}
+.go-btn {
+    background-color: #007bff; color: white; border: none; padding: 5px 15px;
+    cursor: pointer; border-radius: 4px; margin-left: 10px;
+}
+button:hover { opacity: 0.9; }
+
 /* 레이아웃 */
 .container {
     display: flex; 
     margin: 1rem;
-    gap: 20px; /* 사이 간격 */
+    gap: 20px; 
 }
 #bible-area {
     flex: 3; 
@@ -40,17 +75,17 @@ header {
     border-bottom: 1px solid #eee;
     padding-bottom: 1rem;
 }
-.korean-text { font-size: 1.1rem; color: #333; margin-bottom: 0.5rem; font-weight: bold; }
-.english-text { font-size: 0.95rem; color: #555; margin-bottom: 0.5rem; font-family: "Times New Roman", serif; }
-.hebrew-text { font-size: 1.3rem; color: #000; direction: rtl; font-family: "Ezra SIL", serif; }
+.korean-text { font-size: 1.2rem; color: #333; margin-bottom: 0.5rem; font-weight: bold; }
+.english-text { font-size: 1rem; color: #555; margin-bottom: 0.5rem; font-family: "Times New Roman", serif; }
+.hebrew-text { font-size: 1.4rem; color: #000; direction: rtl; font-family: "Ezra SIL", serif; margin-top: 10px;}
 .hebrew-word { cursor: pointer; text-decoration: underline; text-decoration-color: #ccc; }
 .hebrew-word:hover { background-color: #f0f0f0; color: blue; }
 
-/* --- [새로 추가됨] 주석 에디터 스타일 --- */
+/* 주석 에디터 스타일 */
 #commentary-display {
     margin-bottom: 20px;
     min-height: 50px;
-    white-space: pre-wrap; /* 줄바꿈 유지 */
+    white-space: pre-wrap; 
 }
 textarea {
     width: 100%;
@@ -61,6 +96,7 @@ textarea {
     border-radius: 4px;
     resize: vertical;
     font-family: sans-serif;
+    box-sizing: border-box; /* 패딩 포함 크기 계산 */
 }
 .action-btn {
     background-color: #333; color: white; border: none; padding: 10px;
@@ -75,7 +111,6 @@ textarea {
     flex: 1; background-color: #dc3545; color: white; border: none; padding: 10px;
     cursor: pointer; border-radius: 4px;
 }
-button:hover { opacity: 0.9; }
 
 /* 팝업 스타일 */
 #lexicon-modal {
