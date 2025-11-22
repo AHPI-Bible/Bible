@@ -1,22 +1,19 @@
-// Render 서버 주소 (한글/주석용)
+// Render 서버 주소
 const AHPI_API_BASE_URL = "https://ahpi-bible-backend.onrender.com/api";
 
-// 성경 데이터 (장수 정보)
+// 성경 데이터
 const BIBLE_DATA = {
-    // --- 구약 (Old Testament) ---
     "Genesis": 50, "Exodus": 40, "Leviticus": 27, "Numbers": 36, "Deuteronomy": 34,
     "Joshua": 24, "Judges": 21, "Ruth": 4, "1 Samuel": 31, "2 Samuel": 24, "1 Kings": 22, "2 Kings": 25, "1 Chronicles": 29, "2 Chronicles": 36, "Ezra": 10, "Nehemiah": 13, "Esther": 10,
     "Job": 42, "Psalms": 150, "Proverbs": 31, "Ecclesiastes": 12, "Song of Songs": 8,
     "Isaiah": 66, "Jeremiah": 52, "Lamentations": 5, "Ezekiel": 48, "Daniel": 12,
     "Hosea": 14, "Joel": 3, "Amos": 9, "Obadiah": 1, "Jonah": 4, "Micah": 7, "Nahum": 3, "Habakkuk": 3, "Zephaniah": 3, "Haggai": 2, "Zechariah": 14, "Malachi": 4,
-    // --- 신약 (New Testament) ---
     "Matthew": 28, "Mark": 16, "Luke": 24, "John": 21, "Acts": 28,
     "Romans": 16, "1 Corinthians": 16, "2 Corinthians": 13, "Galatians": 6, "Ephesians": 6, "Philippians": 4, "Colossians": 4,
     "1 Thessalonians": 5, "2 Thessalonians": 3, "1 Timothy": 6, "2 Timothy": 4, "Titus": 3, "Philemon": 1,
     "Hebrews": 13, "James": 5, "1 Peter": 5, "2 Peter": 3, "1 John": 5, "2 John": 1, "3 John": 1, "Jude": 1, "Revelation": 22
 };
 
-// 신약 성경 목록 (이 책들은 Bible-Api.com을 사용함)
 const NT_BOOKS = [
     "Matthew", "Mark", "Luke", "John", "Acts", "Romans", "1 Corinthians", "2 Corinthians", 
     "Galatians", "Ephesians", "Philippians", "Colossians", "1 Thessalonians", "2 Thessalonians", 
@@ -63,7 +60,7 @@ document.addEventListener("DOMContentLoaded", function() {
     fetchHybridText(currentBook, currentChapter, currentVerse);
 });
 
-// --- 데이터 로드 핵심 로직 (구약/신약 분기 처리) ---
+// --- 데이터 로드 핵심 로직 ---
 async function fetchHybridText(book, chapter, verse) {
     currentBook = book;
     currentChapter = chapter;
@@ -76,7 +73,7 @@ async function fetchHybridText(book, chapter, verse) {
     displayArea.innerHTML = `<p>데이터를 로드하는 중...</p>`;
     commentDisplay.innerText = "로딩 중...";
 
-    // 1. AHPI 서버 (한글, 주석) - 공통
+    // 1. AHPI 서버 (한글, 주석)
     const ahpiPromise = fetch(`${AHPI_API_BASE_URL}/get_data/${book}/${chapter}/${verse}`)
         .then(res => res.json());
 
@@ -84,21 +81,34 @@ async function fetchHybridText(book, chapter, verse) {
     let originalTextPromise;
     
     if (NT_BOOKS.includes(book)) {
-        // [신약] Bible-Api.com 사용 (헬라어 + 영어)
-        // 두 번 호출해야 함 (영어 버전, 헬라어 버전)
+        // [신약]
+        // 영어: Bible-Api (WEB 버전)
         const englishPromise = fetch(`https://bible-api.com/${book}+${chapter}:${verse}?translation=web`).then(res => res.json());
-        const greekPromise = fetch(`https://bible-api.com/${book}+${chapter}:${verse}?translation=sblgnt`).then(res => res.json());
         
+        // [수정됨] 헬라어: Sefaria (SBL Greek New Testament 버전) - 여기가 훨씬 안정적임
+        const greekPromise = fetch(`https://www.sefaria.org/api/texts/${book}.${chapter}.${verse}?version=SBL_Greek_New_Testament`)
+            .then(res => {
+                if (!res.ok) return { text: "" }; // 에러나면 빈 값
+                return res.json();
+            })
+            .catch(() => ({ text: "" }));
+
         originalTextPromise = Promise.all([englishPromise, greekPromise]).then(([enData, grData]) => {
+            // Sefaria는 text 필드에 헬라어를 담아 보냄 (배열일 수도 있음)
+            let greekText = Array.isArray(grData.text) ? grData.text.join(" ") : (grData.text || "헬라어 본문 없음");
+            
+            // HTML 태그 제거 (혹시 있을 경우)
+            greekText = greekText.replace(/<[^>]*>?/gm, '');
+
             return {
                 text: enData.text || "영어 본문 없음",
-                he: grData.text || "헬라어 본문 없음", // 'he' 변수명을 그대로 써서 헬라어 담음
-                next: null, // Bible-Api는 next 정보를 안 줌 (수동 계산 필요)
+                he: greekText, 
+                next: null,
                 prev: null
             };
         });
     } else {
-        // [구약] Sefaria API 사용 (히브리어 + 영어)
+        // [구약] Sefaria API (히브리어 + 영어)
         originalTextPromise = fetch(`https://www.sefaria.org/api/texts/${book}.${chapter}.${verse}?context=0`)
             .then(res => {
                 if (!res.ok) return { text: "", he: "" };
@@ -109,28 +119,18 @@ async function fetchHybridText(book, chapter, verse) {
     try {
         const [ahpiData, textData] = await Promise.all([ahpiPromise, originalTextPromise]);
         
-        // [안전 장치] 데이터가 없는 경우 처리
         const koreanText = ahpiData.korean_text || "한글 본문을 찾을 수 없습니다.";
         const englishText = textData.text || "";
-        const originalText = textData.he || ""; // 구약은 히브리어, 신약은 헬라어
+        const originalText = textData.he || ""; 
 
-        // 다음/이전 절 계산 (Sefaria가 주면 쓰고, 안 주면 수동 계산)
         nextRef = textData.next || null;
         prevRef = textData.prev || null;
         
-        // 신약이거나 Sefaria가 정보를 안 준 경우 수동 계산
-        if (!nextRef) {
-            // 간단하게 다음 절로 설정 (마지막 절 처리는 생략)
-            nextRef = `${book} ${chapter}:${verse + 1}`;
-        }
-        if (!prevRef && verse > 1) {
-            prevRef = `${book} ${chapter}:${verse - 1}`;
-        }
+        // 신약 등 next 정보 없을 때 수동 계산
+        if (!nextRef) nextRef = `${book} ${chapter}:${verse + 1}`;
+        if (!prevRef && verse > 1) prevRef = `${book} ${chapter}:${verse - 1}`;
 
-        // 신약의 경우 절 개수 확인을 위한 별도 처리 (Bible-Api는 장 전체 정보를 한번에 안 줌)
-        // 여기서는 편의상 기존에 있는 'updateVerseOptions'는 
-        // 구약(Sefaria)일 때만 정확히 작동하고, 신약은 임시로 넉넉히 둡니다.
-        // (완벽하게 하려면 신약도 장 전체를 호출해야 하지만 성능상 일단 둡니다)
+        // 신약 절 개수 확인 (Sefaria 이용)
         if (!NT_BOOKS.includes(book)) {
              fetch(`https://www.sefaria.org/api/texts/${book}.${chapter}?context=0&pad=0`)
                 .then(res => res.json())
@@ -149,7 +149,7 @@ async function fetchHybridText(book, chapter, verse) {
         commentDisplay.innerText = ahpiData.ahpi_commentary;
         
         resetEditorMode();
-        makeHebrewWordsClickable(); // (신약 헬라어는 클릭 사전이 아직 지원 안 됨 -> 추후 과제)
+        makeHebrewWordsClickable(); 
 
     } catch (error) {
         console.error("실패:", error);
@@ -157,9 +157,7 @@ async function fetchHybridText(book, chapter, verse) {
     }
 }
 
-// --- 이하 기존 함수들 그대로 유지 ---
-
-// 검색 기능
+// --- 검색 기능 ---
 async function performSearch() {
     const query = document.getElementById("search-input").value;
     if (query.length < 2) {
@@ -201,6 +199,7 @@ window.goToSearchResult = function(book, chapter, verse) {
     fetchHybridText(book, chapter, verse);
 };
 
+// --- 초기화 및 이동 로직 ---
 function initSelectors() {
     const bookSelect = document.getElementById("book-select");
     BOOK_NAMES.forEach(book => {
@@ -326,12 +325,9 @@ async function saveCommentary() {
 function makeHebrewWordsClickable() {
     const hebrewElement = document.querySelector(".hebrew-text");
     if (!hebrewElement) return;
-    // 신약(헬라어)은 아직 단어 클릭 사전이 지원되지 않으므로 클릭 기능 제외할 수도 있음.
-    // 여기서는 일단 공백으로 나누기만 함.
     const words = hebrewElement.textContent.split(/\s+/).filter(w => w.length > 0);
     let htmlContent = '';
     words.forEach(word => {
-        // 구약(히브리어)인 경우만 클릭 태그 적용
         if (/[\u0590-\u05FF]/.test(word)) {
             htmlContent += `<span class="hebrew-word" data-word="${word}">${word}</span> `;
         } else {
