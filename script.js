@@ -1,5 +1,5 @@
 // AHPI 서버 주소 (로컬 컴퓨터)
-const AHPI_API_BASE_URL = ""https://ahpi-bible-backend.onrender.com/api/get_data"";
+const AHPI_API_BASE_URL = "https://ahpi-bible-backend.onrender.com/api/get_data";
 document.addEventListener("DOMContentLoaded", function() {
     // 팝업 닫기 버튼 설정
     document.getElementById("modal-close-button").addEventListener("click", function() {
