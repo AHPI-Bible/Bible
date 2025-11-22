@@ -13,17 +13,18 @@
     </header>
 
     <div class="nav-container">
-        <button id="prev-btn" class="nav-btn">◀ 이전 절</button>
+        <button id="prev-btn" class="nav-btn">◀ 이전</button>
         
         <div class="nav-inputs">
-            <input type="text" id="book-input" value="Genesis" placeholder="Book (예: Genesis)">
+            <select id="book-select"></select>
+            
             <input type="number" id="chapter-input" value="1" min="1">
             <span class="colon">:</span>
             <input type="number" id="verse-input" value="1" min="1">
             <button id="go-btn" class="go-btn">이동</button>
         </div>
 
-        <button id="next-btn" class="nav-btn">다음 절 ▶</button>
+        <button id="next-btn" class="nav-btn">다음 ▶</button>
     </div>
 
     <main class="container">
@@ -35,6 +36,7 @@
 
         <aside id="commentary-area">
             <h2>AHPI 주석</h2>
+            
             <div id="commentary-display"></div>
             <button id="edit-btn" class="action-btn">주석 작성 / 수정</button>
 

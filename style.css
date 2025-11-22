@@ -1,6 +1,5 @@
 /* 기본 설정 */
 body {
-    /* 맥(Apple SD...)과 윈도우(Malgun Gothic) 표준 폰트 지정 */
     font-family: "Apple SD Gothic Neo", "Malgun Gothic", "Dotum", sans-serif;
     line-height: 1.6;
     margin: 0;
@@ -13,12 +12,12 @@ header {
     text-align: center;
 }
 
-/* [NEW] 내비게이션 바 스타일 */
+/* 내비게이션 바 스타일 */
 .nav-container {
     background-color: #e9ecef;
     padding: 10px 20px;
     display: flex;
-    justify-content: space-between; /* 양끝 정렬 */
+    justify-content: space-between;
     align-items: center;
     border-bottom: 1px solid #ddd;
     margin-bottom: 1rem;
@@ -28,22 +27,24 @@ header {
     align-items: center;
     gap: 5px;
 }
-.nav-inputs input {
-    padding: 5px;
+.nav-inputs input, .nav-inputs select {
+    padding: 8px;
     border: 1px solid #ccc;
     border-radius: 4px;
     text-align: center;
+    font-size: 1rem;
 }
-#book-input { width: 120px; }
+/* [수정됨] 책 선택창 너비 조정 */
+#book-select { width: 150px; text-align: left; } 
 #chapter-input, #verse-input { width: 60px; }
 .colon { font-weight: bold; }
 
 .nav-btn {
-    background-color: #6c757d; color: white; border: none; padding: 5px 15px;
-    cursor: pointer; border-radius: 4px;
+    background-color: #6c757d; color: white; border: none; padding: 8px 15px;
+    cursor: pointer; border-radius: 4px; font-size: 0.9rem;
 }
 .go-btn {
-    background-color: #007bff; color: white; border: none; padding: 5px 15px;
+    background-color: #007bff; color: white; border: none; padding: 8px 15px;
     cursor: pointer; border-radius: 4px; margin-left: 10px;
 }
 button:hover { opacity: 0.9; }
@@ -91,9 +92,12 @@ button:hover { opacity: 0.9; }
 textarea {
     width: 100%;
     height: 150px;
-    /* ... 중간 생략 ... */
+    padding: 10px;
+    margin-bottom: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
     resize: vertical;
-    font-family: sans-serif; /* 여기가 문제의 원인 */
+    font-family: "Apple SD Gothic Neo", "Malgun Gothic", "Dotum", sans-serif;
     box-sizing: border-box;
 }
 .action-btn {

@@ -1,66 +1,111 @@
 // Render 서버 주소
 const AHPI_API_BASE_URL = "https://ahpi-bible-backend.onrender.com/api";
 
-// 현재 위치 상태 관리
+// 성경 66권 목록 (Sefaria 호환 영문명)
+const BIBLE_BOOKS = [
+    "Genesis", "Exodus", "Leviticus", "Numbers", "Deuteronomy",
+    "Joshua", "Judges", "Ruth", "1 Samuel", "2 Samuel", "1 Kings", "2 Kings", "1 Chronicles", "2 Chronicles", "Ezra", "Nehemiah", "Esther",
+    "Job", "Psalms", "Proverbs", "Ecclesiastes", "Song of Songs",
+    "Isaiah", "Jeremiah", "Lamentations", "Ezekiel", "Daniel",
+    "Hosea", "Joel", "Amos", "Obadiah", "Jonah", "Micah", "Nahum", "Habakkuk", "Zephaniah", "Haggai", "Zechariah", "Malachi",
+    "Matthew", "Mark", "Luke", "John", "Acts",
+    "Romans", "1 Corinthians", "2 Corinthians", "Galatians", "Ephesians", "Philippians", "Colossians",
+    "1 Thessalonians", "2 Thessalonians", "1 Timothy", "2 Timothy", "Titus", "Philemon",
+    "Hebrews", "James", "1 Peter", "2 Peter", "1 John", "2 John", "3 John", "Jude", "Revelation"
+];
+
+// 현재 상태
 let currentBook = "Genesis";
 let currentChapter = 1;
 let currentVerse = 1;
+// 다음/이전 절 정보를 저장할 변수 (Sefaria API에서 받아옴)
+let nextRef = null;
+let prevRef = null;
 
 document.addEventListener("DOMContentLoaded", function() {
-    // 1. 팝업 닫기
+    // 1. 책 목록(드롭다운) 생성
+    initBookSelect();
+
+    // 2. 팝업 닫기
     document.getElementById("modal-close-button").addEventListener("click", () => {
         document.getElementById("lexicon-modal").style.display = "none";
     });
 
-    // 2. 내비게이션 버튼 이벤트
-    document.getElementById("prev-btn").addEventListener("click", () => navigateVerse(-1));
-    document.getElementById("next-btn").addEventListener("click", () => navigateVerse(1));
+    // 3. 내비게이션 버튼 이벤트
+    document.getElementById("prev-btn").addEventListener("click", goToPrev);
+    document.getElementById("next-btn").addEventListener("click", goToNext);
     document.getElementById("go-btn").addEventListener("click", navigateManual);
 
-    // 3. 주석 에디터 이벤트
+    // 4. 에디터 설정 및 초기 로드
     setupEditorEvents();
-
-    // 4. 초기 데이터 로드
     fetchHybridText(currentBook, currentChapter, currentVerse);
 });
 
-// [이동 기능 1] 이전/다음 절 버튼
-function navigateVerse(direction) {
-    // 현재는 단순하게 절 번호만 증감시킵니다.
-    // (추후: 1장이 끝나면 2장 1절로 넘어가는 고급 로직 필요)
-    let newVerse = currentVerse + direction;
-    if (newVerse < 1) newVerse = 1; // 1절 미만 방지
-    
-    fetchHybridText(currentBook, currentChapter, newVerse);
+// 책 선택창(Select) 초기화 함수
+function initBookSelect() {
+    const select = document.getElementById("book-select");
+    BIBLE_BOOKS.forEach(book => {
+        const option = document.createElement("option");
+        option.value = book;
+        option.innerText = book;
+        select.appendChild(option);
+    });
 }
 
-// [이동 기능 2] 직접 입력 이동
+// [스마트 이동 1] 다음 절로 이동
+function goToNext() {
+    if (nextRef) {
+        // Sefaria가 알려준 '다음 절' 정보(예: "Genesis 1:2" 또는 "Genesis 2:1")를 파싱해서 이동
+        parseAndNavigate(nextRef);
+    } else {
+        alert("다음 절이 없습니다 (책의 끝입니다).");
+    }
+}
+
+// [스마트 이동 2] 이전 절로 이동
+function goToPrev() {
+    if (prevRef) {
+        parseAndNavigate(prevRef);
+    } else {
+        alert("이전 절이 없습니다 (책의 시작입니다).");
+    }
+}
+
+// "Book Chapter:Verse" 문자열을 분해해서 이동하는 함수
+function parseAndNavigate(refString) {
+    // 예: "Genesis 1:2" -> lastSpaceIndex를 찾아 분리
+    const lastSpace = refString.lastIndexOf(" ");
+    const bookName = refString.substring(0, lastSpace);
+    const rest = refString.substring(lastSpace + 1); // "1:2"
+    const [chap, ver] = rest.split(":");
+    
+    fetchHybridText(bookName, parseInt(chap), parseInt(ver));
+}
+
+// [이동 기능 3] 직접 입력 이동
 function navigateManual() {
-    const book = document.getElementById("book-input").value;
+    const book = document.getElementById("book-select").value;
     const chapter = parseInt(document.getElementById("chapter-input").value);
     const verse = parseInt(document.getElementById("verse-input").value);
 
     if (book && chapter > 0 && verse > 0) {
         fetchHybridText(book, chapter, verse);
-    } else {
-        alert("올바른 성경 위치를 입력하세요.");
     }
 }
 
-// UI 업데이트 (현재 위치 표시)
+// UI 업데이트
 function updateNavUI() {
-    document.getElementById("book-input").value = currentBook;
+    document.getElementById("book-select").value = currentBook;
     document.getElementById("chapter-input").value = currentChapter;
     document.getElementById("verse-input").value = currentVerse;
 }
 
-// 데이터 불러오기 및 화면 표시
+// 데이터 불러오기
 async function fetchHybridText(book, chapter, verse) {
-    // 상태 업데이트
     currentBook = book;
     currentChapter = chapter;
     currentVerse = verse;
-    updateNavUI(); // 입력창 숫자 동기화
+    updateNavUI();
 
     const displayArea = document.querySelector(".bible-text-container");
     const commentDisplay = document.getElementById('commentary-display');
@@ -70,15 +115,17 @@ async function fetchHybridText(book, chapter, verse) {
 
     try {
         const ahpiPromise = fetch(`${AHPI_API_BASE_URL}/get_data/${book}/${chapter}/${verse}`).then(res => res.json());
+        // Sefaria API 호출 (context=0으로 주변절 정보는 끄지만, next/prev 정보는 받아옴)
         const sefariaPromise = fetch(`https://www.sefaria.org/api/texts/${book}.${chapter}.${verse}?context=0`).then(res => res.json());
 
         const [ahpiData, sefariaData] = await Promise.all([ahpiPromise, sefariaPromise]);
         
-        if (ahpiData.error || !sefariaData.text) {
-             throw new Error("데이터를 찾을 수 없습니다.");
-        }
+        if (ahpiData.error || !sefariaData.text) throw new Error("데이터 오류");
 
-        // 본문 표시
+        // Sefaria가 주는 다음/이전 절 정보 저장
+        nextRef = sefariaData.next; // 예: "Genesis 1:2"
+        prevRef = sefariaData.prev; // 예: null or "Genesis 1:1"
+
         displayArea.innerHTML = `
             <div class="verse">
                 <p class="korean-text">${ahpiData.korean_text}</p>
@@ -86,24 +133,19 @@ async function fetchHybridText(book, chapter, verse) {
                 <p class="hebrew-text" dir="rtl">${sefariaData.he}</p> 
             </div>
         `;
-        
-        // 주석 표시
         commentDisplay.innerText = ahpiData.ahpi_commentary;
         
-        // 편집 모드였다면 다시 보기 모드로 초기화
         resetEditorMode();
-        
-        // 히브리어 클릭 활성화
         makeHebrewWordsClickable(); 
 
     } catch (error) {
         console.error("실패:", error);
-        displayArea.innerHTML = `<p style="color:red;">해당 구절을 찾을 수 없습니다. (Book 이름을 영어로 정확히 입력했는지 확인하세요)</p>`;
+        displayArea.innerHTML = `<p style="color:red;">해당 구절을 찾을 수 없습니다.</p>`;
         commentDisplay.innerText = "";
     }
 }
 
-// 에디터 관련 이벤트 설정
+// 에디터 설정 (기존과 동일)
 function setupEditorEvents() {
     const editBtn = document.getElementById("edit-btn");
     const saveBtn = document.getElementById("save-btn");
@@ -153,18 +195,17 @@ async function saveCommentary() {
             document.getElementById('commentary-display').innerText = content;
             resetEditorMode();
         } else {
-            alert("저장 실패: 서버 오류");
+            alert("저장 실패");
         }
     } catch (error) {
-        console.error("저장 오류:", error);
-        alert("저장에 실패했습니다.");
+        alert("통신 오류");
     } finally {
         saveBtn.innerText = "저장";
         saveBtn.disabled = false;
     }
 }
 
-// 히브리어 단어 클릭 기능 (기존과 동일)
+// 히브리어 클릭 (기존과 동일)
 function makeHebrewWordsClickable() {
     const hebrewElement = document.querySelector(".hebrew-text");
     if (!hebrewElement) return;
