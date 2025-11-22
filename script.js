@@ -16,8 +16,7 @@ const BOOK_NAMES = Object.keys(BIBLE_DATA);
 
 let currentBook = "Genesis";
 let currentChapter = 1;
-let currentVerse = 1; // 현재 선택된 절 (주해용)
-// 로드된 챕터 데이터 저장용 (캐시)
+let currentVerse = 1;
 let loadedChapterData = { korean: {}, english: [], original: [], commentaries: {} };
 
 document.addEventListener("DOMContentLoaded", function() {
@@ -27,93 +26,85 @@ document.addEventListener("DOMContentLoaded", function() {
 });
 
 function setupEventListeners() {
-    // 팝업 닫기
     document.getElementById("modal-close-button").onclick = () => document.getElementById("lexicon-modal").style.display = "none";
     document.getElementById("search-close-button").onclick = () => document.getElementById("search-result-modal").style.display = "none";
-
-    // 내비게이션
     document.getElementById("prev-btn").onclick = goToPrevChapter;
     document.getElementById("next-btn").onclick = goToNextChapter;
     document.getElementById("go-btn").onclick = navigateManual;
     document.getElementById("search-btn").onclick = performSearch;
     document.getElementById("search-input").onkeypress = (e) => { if(e.key === 'Enter') performSearch(); };
-
-    // 드롭다운 변경
     document.getElementById("book-select").onchange = function() {
         updateChapterOptions(this.value);
         updateVerseOptions(176); 
         document.getElementById("verse-select").value = 1;
     };
-    // [절 선택 변경 시] -> 해당 절로 스크롤 + 주해 선택
-    document.getElementById("verse-select").onchange = function() {
-        selectVerse(parseInt(this.value));
-    };
-
-    // 에디터
+    document.getElementById("verse-select").onchange = function() { selectVerse(parseInt(this.value)); };
     const editBtn = document.getElementById("edit-btn");
     const saveBtn = document.getElementById("save-btn");
     const cancelBtn = document.getElementById("cancel-btn");
-    
     editBtn.onclick = openEditor;
     cancelBtn.onclick = closeEditor;
     saveBtn.onclick = saveCommentary;
 }
 
-// --- [핵심] 챕터 전체 로드 ---
+// --- [핵심 수정] 챕터 로드 ---
 async function fetchChapter(book, chapter) {
     currentBook = book;
     currentChapter = chapter;
-    // 챕터 이동 시 기본 1절 선택
     currentVerse = 1; 
     updateNavUI();
 
     const bibleList = document.getElementById("bible-list");
     bibleList.innerHTML = "<p>데이터를 불러오는 중입니다...</p>";
     
-    // 1. AHPI 서버 (한글 + 모든 주해)
+    // 1. AHPI 서버 (한글 + 주해 + **헬라어**)
+    // 이제 헬라어도 우리 서버에서 줍니다.
     const ahpiPromise = fetch(`${AHPI_API_BASE_URL}/get_chapter_data/${book}/${chapter}`).then(res => res.json());
 
-    // 2. 외부 API (영어 + 원어)
+    // 2. 외부 API (영어 + 구약 히브리어)
     let externalPromise;
-    if (NT_BOOKS.includes(book)) {
-        // 신약 (Bible-Api & Sefaria Hybrid)
-        const bookId = NT_BOOKS.indexOf(book) + 40;
+    const isNT = NT_BOOKS.includes(book);
+
+    if (isNT) {
+        // [신약] 영어는 Bible-api, 헬라어는 우리 서버 사용
         const engP = fetch(`https://bible-api.com/${book}+${chapter}?translation=web`).then(res => res.json());
-        // 헬라어 (Sefaria SBL)
-        const grkP = fetch(`https://www.sefaria.org/api/texts/${book}.${chapter}?version=SBL_Greek_New_Testament`).then(res => res.ok ? res.json() : {text:[]});
-        
-        externalPromise = Promise.all([engP, grkP]).then(([en, gr]) => ({
-            en: en.verses || [], // Bible-api returns array of objects
-            he: gr.text || []    // Sefaria returns array of strings
-        }));
+        // 외부 헬라어는 이제 안 부릅니다 (우리 서버에 있으니까!)
+        externalPromise = engP.then(en => ({
+            en: en.verses || [],
+            he: null // 헬라어는 ahpiData에서 가져옴
+        })).catch(()=>({en:[], he:null}));
     } else {
-        // 구약 (Sefaria)
+        // [구약] Sefaria (히브리어 + 영어)
         externalPromise = fetch(`https://www.sefaria.org/api/texts/${book}.${chapter}?context=0`).then(res => res.json());
     }
 
     try {
         const [ahpiData, extData] = await Promise.all([ahpiPromise, externalPromise]);
         
-        // 데이터 저장
         loadedChapterData.korean = ahpiData.korean_verses;
         loadedChapterData.commentaries = ahpiData.commentaries;
+        // [NEW] 서버에서 받은 헬라어 데이터
+        const greekFromOurServer = ahpiData.greek_verses || {}; 
         
-        // 외부 데이터 포맷 통일
-        if (NT_BOOKS.includes(book)) {
-            // 신약 데이터 가공
+        if (isNT) {
+            // 신약 데이터 조립
             loadedChapterData.english = extData.en.map(v => v.text.replace(/<[^>]*>?/gm, '')); 
-            loadedChapterData.original = Array.isArray(extData.he) ? extData.he : [];
+            
+            // 헬라어: 서버에서 받은 딕셔너리 {1: "텍스트", 2: "..."} 를 배열로 변환
+            // (화면 그리기 편하게)
+            const maxV = Object.keys(greekFromOurServer).length;
+            loadedChapterData.original = [];
+            for(let i=1; i<=maxV; i++) {
+                loadedChapterData.original.push(greekFromOurServer[i] || "");
+            }
         } else {
-            // 구약 데이터 가공 (Sefaria)
+            // 구약 데이터 (Sefaria)
             loadedChapterData.english = extData.text || [];
             loadedChapterData.original = extData.he || [];
         }
 
-        // [UI 렌더링] 리스트 만들기
         renderBibleList();
-        // 드롭다운 절 개수 업데이트
-        updateVerseOptions(Object.keys(loadedChapterData.korean).length || loadedChapterData.english.length);
-        // 1절 자동 선택
+        updateVerseOptions(Math.max(Object.keys(loadedChapterData.korean).length, loadedChapterData.english.length));
         selectVerse(1);
 
     } catch (error) {
@@ -122,16 +113,10 @@ async function fetchChapter(book, chapter) {
     }
 }
 
-// --- [UI] 성경 리스트 그리기 ---
 function renderBibleList() {
     const list = document.getElementById("bible-list");
     list.innerHTML = "";
-
-    // 절 개수 파악 (한글 데이터 기준, 없으면 영어 기준)
-    const maxVerse = Math.max(
-        Object.keys(loadedChapterData.korean).length, 
-        loadedChapterData.english.length
-    );
+    const maxVerse = Math.max(Object.keys(loadedChapterData.korean).length, loadedChapterData.english.length);
 
     if (maxVerse === 0) {
         list.innerHTML = "<p>본문이 없습니다.</p>";
@@ -141,20 +126,18 @@ function renderBibleList() {
     for (let i = 1; i <= maxVerse; i++) {
         const div = document.createElement("div");
         div.className = "verse-item";
-        div.id = `verse-row-${i}`; // 스크롤 이동용 ID
-        div.onclick = () => selectVerse(i); // 클릭 시 선택
+        div.id = `verse-row-${i}`; 
+        div.onclick = () => selectVerse(i); 
 
         const kor = loadedChapterData.korean[i] || "";
-        // 배열 인덱스는 0부터 시작하므로 i-1
         const eng = loadedChapterData.english[i-1] || "";
         const ori = loadedChapterData.original[i-1] || "";
 
-        // HTML 조립
         let html = `<span class="verse-num">${i}.</span>`;
         html += `<span class="korean-text">${kor}</span>`;
         html += `<span class="english-text">${eng}</span>`;
         
-        // 원어 단어 처리 (클릭 기능)
+        // 원어 단어 처리
         const oriWords = ori.replace(/<[^>]*>?/gm, '').split(/\s+/);
         let oriHtml = "";
         oriWords.forEach(w => {
@@ -167,37 +150,25 @@ function renderBibleList() {
     }
 }
 
-// --- [핵심] 절 선택 (Select Verse) ---
 function selectVerse(verseNum) {
     currentVerse = verseNum;
-    
-    // 1. 왼쪽 리스트에서 하이라이트 표시
     document.querySelectorAll(".verse-item").forEach(el => el.classList.remove("selected"));
     const targetRow = document.getElementById(`verse-row-${verseNum}`);
     if (targetRow) {
         targetRow.classList.add("selected");
         targetRow.scrollIntoView({ behavior: "smooth", block: "center" });
     }
-
-    // 2. 오른쪽 주해 창 업데이트
     document.getElementById("current-verse-display").innerText = `${currentBook} ${currentChapter}:${verseNum}`;
     const comment = loadedChapterData.commentaries[verseNum];
     document.getElementById("commentary-display").innerText = comment ? comment : "작성된 주해가 없습니다.";
-    
-    // 에디터 닫기
     closeEditor();
-    
-    // 드롭다운 값 동기화
     document.getElementById("verse-select").value = verseNum;
 }
 
-// --- 주해 작성/수정 ---
 function openEditor() {
     const displayDiv = document.getElementById("commentary-display");
     const input = document.getElementById("commentary-input");
-    
     input.value = displayDiv.innerText === "작성된 주해가 없습니다." ? "" : displayDiv.innerText;
-    
     document.getElementById("commentary-display").style.display = "none";
     document.getElementById("edit-btn").style.display = "none";
     document.getElementById("editor-container").style.display = "block";
@@ -213,7 +184,6 @@ async function saveCommentary() {
     const content = document.getElementById("commentary-input").value;
     const btn = document.getElementById("save-btn");
     btn.innerText = "저장 중...";
-    
     try {
         const res = await fetch(`${AHPI_API_BASE_URL}/save_commentary`, {
             method: 'POST',
@@ -224,25 +194,21 @@ async function saveCommentary() {
         });
         if (res.ok) {
             alert("저장되었습니다.");
-            // 로컬 데이터 갱신
             loadedChapterData.commentaries[currentVerse] = content;
-            selectVerse(currentVerse); // 화면 갱신
+            selectVerse(currentVerse); 
         } else alert("저장 실패");
     } catch(e) { alert("오류 발생"); }
     finally { btn.innerText = "저장"; }
 }
 
-// --- 사전 팝업 ---
 window.openLexicon = async function(event, word) {
-    event.stopPropagation(); // 부모 클릭 방지
+    event.stopPropagation(); 
     const modal = document.getElementById("lexicon-modal");
     const body = document.getElementById("modal-body");
-    
     body.innerHTML = "검색 중...";
     modal.style.display = "flex";
     
     try {
-        // 구약 히브리어만 지원 (신약은 추후)
         const res = await fetch(`https://www.sefaria.org/api/words/${word}`);
         const data = await res.json();
         let html = `<h3 dir="rtl">${data.entry}</h3>`;
@@ -252,8 +218,6 @@ window.openLexicon = async function(event, word) {
     } catch(e) { body.innerHTML = "<p>정보 없음</p>"; }
 };
 
-// --- 기타 유틸리티 (이동, 검색 등) ---
-// (기존 함수들과 거의 동일, initSelectors 등은 위에 포함됨)
 function updateChapterOptions(bookName) {
     const sel = document.getElementById("chapter-select");
     sel.innerHTML = "";
@@ -300,14 +264,8 @@ function navigateManual() {
     const c = parseInt(document.getElementById("chapter-select").value);
     const v = parseInt(document.getElementById("verse-select").value);
     fetchChapter(b, c);
-    // 페이지 로드 후 해당 절로 이동하기 위해 약간의 지연 후 selectVerse 호출은 
-    // fetchChapter 내부의 render 완료 시점 처리로 해결됨.
-    // 여기서는 fetchChapter 호출 시 v 값을 전달하지 않았으므로,
-    // fetchChapter 함수에 verse 인자를 추가하거나 전역 currentVerse를 설정해야 함.
-    currentVerse = v; // 전역 변수 미리 설정
+    currentVerse = v; 
 }
-
-// 검색 기능 (기존과 동일, 클릭 시 fetchChapter 호출로 변경)
 async function performSearch() {
     const q = document.getElementById("search-input").value;
     if(q.length<2) return alert("2글자 이상 입력");
@@ -329,13 +287,11 @@ async function performSearch() {
         ).join("");
     } else body.innerHTML = "결과 없음";
 }
-
 window.goToSearchResult = function(b, c, v) {
     document.getElementById("search-result-modal").style.display = "none";
-    currentVerse = v; // 이동할 절 설정
+    currentVerse = v; 
     fetchChapter(b, c);
 };
-
 function initSelectors() {
     const bookSelect = document.getElementById("book-select");
     BOOK_NAMES.forEach(book => {

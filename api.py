@@ -7,32 +7,59 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)
 
-# 1. 한글 성경 데이터 로드
-print("--- 서버 시작: 한글 성경 데이터 로드 중 ---")
-BIBLE_CSV_FILE = 'korean_bible.csv'
-bible_data_list = [] # 리스트로 변경 (검색 효율화)
+# ---------------------------------------------------
+# 1. 성경 데이터 로드 (한글 + 헬라어)
+# ---------------------------------------------------
+print("--- 서버 시작: 성경 데이터 로드 중 ---")
 
+# 데이터 저장소
+bible_data_list = []     # 검색용 리스트 (전체)
+korean_map = {}          # 한글 빠른 찾기용
+greek_map = {}           # 헬라어 빠른 찾기용
+
+base_dir = os.path.dirname(os.path.abspath(__file__))
+
+# (1) 한글 로드
 try:
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    csv_path = os.path.join(base_dir, BIBLE_CSV_FILE)
-    
-    with open(csv_path, 'r', encoding='utf-8') as f:
+    with open(os.path.join(base_dir, 'korean_bible.csv'), 'r', encoding='utf-8') as f:
         reader = csv.DictReader(f)
         for row in reader:
-            if not row['book_name'] or not row['chapter_num'] or not row['verse_num']:
-                continue
-            # 데이터를 딕셔너리 리스트로 저장
+            if not row['book_name']: continue
+            # 딕셔너리 키: "Genesis-1-1"
+            key = f"{row['book_name']}-{row['chapter_num']}-{row['verse_num']}"
+            korean_map[key] = row['korean_text']
+            
+            # 검색용 리스트에도 추가
             bible_data_list.append({
                 "book": row['book_name'],
                 "chapter": int(row['chapter_num']),
                 "verse": int(row['verse_num']),
                 "text": row['korean_text']
             })
-    print(f"성경 로드 완료: {len(bible_data_list)}절")
+    print(f"한글 성경 로드 완료: {len(korean_map)}절")
 except Exception as e:
-    print(f"CSV 로드 중 오류: {e}")
+    print(f"한글 로드 실패: {e}")
 
+# (2) 헬라어 로드 (파일이 있을 때만)
+try:
+    greek_path = os.path.join(base_dir, 'greek_bible.csv')
+    if os.path.exists(greek_path):
+        with open(greek_path, 'r', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                # CSV 헤더: book, chapter, verse, text
+                key = f"{row['book']}-{row['chapter']}-{row['verse']}"
+                greek_map[key] = row['text']
+        print(f"헬라어 성경 로드 완료: {len(greek_map)}절")
+    else:
+        print("헬라어 파일(greek_bible.csv)이 없습니다.")
+except Exception as e:
+    print(f"헬라어 로드 실패: {e}")
+
+
+# ---------------------------------------------------
 # 2. DB 연결
+# ---------------------------------------------------
 def get_db_connection():
     conn = psycopg2.connect(os.environ['DATABASE_URL'])
     return conn
@@ -61,23 +88,30 @@ def init_db():
 with app.app_context():
     init_db()
 
+# ---------------------------------------------------
 # 3. API 라우트
+# ---------------------------------------------------
 
-# [핵심] 챕터 데이터 가져오기 (수정됨)
+# [수정됨] 챕터 데이터 가져오기 (한글 + 헬라어 + 주해)
 @app.route('/api/get_chapter_data/<book_name>/<int:chapter_num>', methods=['GET'])
 def get_ahpi_chapter_data(book_name, chapter_num):
-    print(f"요청 받음: {book_name} {chapter_num}장") # 로그 출력
+    print(f"요청: {book_name} {chapter_num}장")
     
-    # 1. 해당 챕터의 모든 한글 절 찾기 (리스트 필터링)
     korean_verses = {}
+    greek_verses = {} # 헬라어 담을 곳
     
-    # 리스트에서 조건에 맞는 것만 뽑기
-    filtered = [row for row in bible_data_list if row['book'] == book_name and row['chapter'] == chapter_num]
-    
-    for item in filtered:
-        korean_verses[item['verse']] = item['text']
-
-    print(f"찾은 한글 절 수: {len(korean_verses)}") # 로그 출력
+    # 1. 메모리에서 한글/헬라어 찾기
+    # (효율을 위해 해당 챕터의 최대 절 수를 대략 176으로 잡고 루프)
+    for i in range(1, 177):
+        key = f"{book_name}-{chapter_num}-{i}"
+        
+        # 한글
+        if key in korean_map:
+            korean_verses[i] = korean_map[key]
+        
+        # 헬라어
+        if key in greek_map:
+            greek_verses[i] = greek_map[key]
 
     # 2. 주해 찾기 (DB)
     commentaries = {}
@@ -98,18 +132,13 @@ def get_ahpi_chapter_data(book_name, chapter_num):
 
     return jsonify({
         'korean_verses': korean_verses,
+        'greek_verses': greek_verses, # 헬라어 데이터 추가됨
         'commentaries': commentaries
     })
 
-# 주해 저장
 @app.route('/api/save_commentary', methods=['POST'])
 def save_commentary():
     data = request.json
-    book = data.get('book')
-    chapter = data.get('chapter')
-    verse = data.get('verse')
-    content = data.get('content')
-
     try:
         conn = get_db_connection()
         cur = conn.cursor()
@@ -118,7 +147,7 @@ def save_commentary():
             VALUES (%s, %s, %s, %s)
             ON CONFLICT (book, chapter, verse) 
             DO UPDATE SET content = EXCLUDED.content;
-        """, (book, chapter, verse, content))
+        """, (data['book'], data['chapter'], data['verse'], data['content']))
         conn.commit()
         cur.close()
         conn.close()
@@ -126,7 +155,6 @@ def save_commentary():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# 검색
 @app.route('/api/search', methods=['GET'])
 def search_bible():
     query = request.args.get('q', '')
@@ -135,8 +163,6 @@ def search_bible():
 
     results = []
     count = 0
-    
-    # 리스트에서 검색
     for item in bible_data_list:
         if query in item['text']:
             results.append(item)
