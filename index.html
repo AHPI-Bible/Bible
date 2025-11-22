@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AHPI 성경 주석</title>
+    <title>AHPI 성경 주해</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -33,21 +33,27 @@
 
     <main class="container">
         <section id="bible-area">
-            <div id="text-display">
-                <div class="bible-text-container"></div>
-            </div>
+            <div class="panel-header">성경 본문</div>
+            <div id="bible-list" class="scrollable-content">
+                </div>
         </section>
 
         <aside id="commentary-area">
-            <h2>AHPI 주석</h2>
-            <div id="commentary-display"></div>
-            <button id="edit-btn" class="action-btn">주석 작성 / 수정</button>
+            <div class="panel-header">AHPI 주해 (<span id="current-verse-display">1절</span>)</div>
+            
+            <div id="commentary-content-wrapper" class="scrollable-content">
+                <div id="commentary-display">
+                    절을 선택하면 주해가 표시됩니다.
+                </div>
+                
+                <button id="edit-btn" class="action-btn">주해 작성 / 수정</button>
 
-            <div id="editor-container" style="display: none;">
-                <textarea id="commentary-input" placeholder="여기에 주석을 작성하세요..."></textarea>
-                <div class="btn-group">
-                    <button id="save-btn" class="save-btn">저장</button>
-                    <button id="cancel-btn" class="cancel-btn">취소</button>
+                <div id="editor-container" style="display: none;">
+                    <textarea id="commentary-input" placeholder="여기에 주해를 작성하세요..."></textarea>
+                    <div class="btn-group">
+                        <button id="save-btn" class="save-btn">저장</button>
+                        <button id="cancel-btn" class="cancel-btn">취소</button>
+                    </div>
                 </div>
             </div>
         </aside>
@@ -65,8 +71,7 @@
         <div id="search-modal-content">
             <span id="search-close-button">&times;</span>
             <h2>검색 결과</h2>
-            <div id="search-results-body">
-                </div>
+            <div id="search-results-body"></div>
         </div>
     </div>
 

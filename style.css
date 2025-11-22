@@ -4,122 +4,103 @@ body {
     line-height: 1.6;
     margin: 0;
     background-color: #f4f4f4;
+    height: 100vh; /* 화면 전체 높이 사용 */
+    display: flex;
+    flex-direction: column;
 }
 header {
-    background: #333;
-    color: #fff;
-    padding: 1rem;
-    text-align: center;
+    background: #333; color: #fff; padding: 1rem; text-align: center; flex-shrink: 0;
 }
 
-/* 내비게이션 바 */
+/* 내비게이션 */
 .nav-container {
-    background-color: #e9ecef;
-    padding: 10px 20px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid #ddd;
-    margin-bottom: 1rem;
-    flex-wrap: wrap; /* 화면 작으면 줄바꿈 */
-    gap: 10px;
+    background-color: #e9ecef; padding: 10px 20px;
+    display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid #ddd; flex-shrink: 0;
+    flex-wrap: wrap; gap: 10px;
 }
-.nav-inputs {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-}
-.nav-inputs select {
-    padding: 8px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    font-size: 1rem;
-    cursor: pointer;
+.nav-inputs { display: flex; align-items: center; gap: 5px; }
+.nav-inputs select, #search-input {
+    padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem;
 }
 #book-select { width: 130px; }
 #chapter-select, #verse-select { width: 60px; }
-.colon { font-weight: bold; margin: 0 2px; }
+.colon { font-weight: bold; }
+.nav-btn, .go-btn {
+    color: white; border: none; padding: 8px 12px; cursor: pointer; border-radius: 4px; font-size: 0.9rem;
+}
+.nav-btn { background-color: #6c757d; }
+.go-btn { background-color: #007bff; margin-left: 5px; }
+#search-btn { background-color: #17a2b8; }
 
-/* 검색창 스타일 */
-.search-box {
-    display: flex;
-    gap: 5px;
-}
-#search-input {
-    padding: 8px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    width: 120px;
-}
-
-.nav-btn {
-    background-color: #6c757d; color: white; border: none; padding: 8px 12px;
-    cursor: pointer; border-radius: 4px; font-size: 0.9rem; white-space: nowrap;
-}
-.go-btn {
-    background-color: #007bff; color: white; border: none; padding: 8px 12px;
-    cursor: pointer; border-radius: 4px; margin-left: 5px;
-}
-button:hover { opacity: 0.9; }
-
-/* 레이아웃 */
+/* 메인 레이아웃 (핵심: 스크롤 처리) */
 .container {
-    display: flex; margin: 1rem; gap: 20px; 
+    display: flex; flex: 1; /* 남은 높이 다 차지 */
+    margin: 1rem; gap: 20px; overflow: hidden; /* 이 안에서 스크롤 */
 }
-#bible-area {
-    flex: 3; background: #fff; padding: 1rem; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-}
-#commentary-area {
-    flex: 2; background: #fff; padding: 1rem; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+#bible-area, #commentary-area {
+    background: #fff; border-radius: 5px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     display: flex; flex-direction: column;
 }
+#bible-area { flex: 3; }
+#commentary-area { flex: 2; }
 
-/* 성경 본문 */
-.verse {
-    border-bottom: 1px solid #eee; padding-bottom: 1rem;
+/* 패널 헤더 & 내용 */
+.panel-header {
+    padding: 10px 15px; background: #f8f9fa; border-bottom: 1px solid #eee;
+    font-weight: bold; color: #555;
 }
-.korean-text { font-size: 1.2rem; color: #333; margin-bottom: 0.5rem; font-weight: bold; }
-.english-text { font-size: 1rem; color: #555; margin-bottom: 0.5rem; font-family: "Times New Roman", serif; }
-.hebrew-text { font-size: 1.4rem; color: #000; direction: rtl; font-family: "Ezra SIL", serif; margin-top: 10px; }
-.hebrew-word { cursor: pointer; text-decoration: underline; text-decoration-color: #ccc; }
-.hebrew-word:hover { background-color: #f0f0f0; color: blue; }
+.scrollable-content {
+    flex: 1; overflow-y: auto; padding: 15px;
+}
 
-/* 에디터 */
+/* 성경 본문 리스트 */
+.verse-item {
+    padding: 15px; border-bottom: 1px solid #eee; cursor: pointer;
+    transition: background-color 0.2s;
+}
+.verse-item:hover { background-color: #f9f9f9; }
+/* 선택된 절 강조 스타일 */
+.verse-item.selected {
+    background-color: #e8f0fe; border-left: 5px solid #007bff;
+}
+
+.verse-num {
+    font-weight: bold; color: #007bff; margin-right: 5px; font-size: 1.1rem;
+}
+.korean-text { font-size: 1.2rem; color: #333; margin-bottom: 0.3rem; display: block;}
+.english-text { font-size: 1rem; color: #666; margin-bottom: 0.3rem; display: block; font-family: "Times New Roman", serif;}
+.hebrew-text { font-size: 1.4rem; color: #000; direction: rtl; font-family: "Ezra SIL", serif; display: block; margin-top: 5px;}
+.hebrew-word { cursor: pointer; text-decoration: underline; text-decoration-color: #ccc; }
+.hebrew-word:hover { background-color: #ddd; color: blue; }
+
+/* 주해 에디터 */
 #commentary-display {
-    margin-bottom: 20px; min-height: 50px; white-space: pre-wrap; 
+    white-space: pre-wrap; line-height: 1.8; font-size: 1.1rem; min-height: 100px;
 }
 textarea {
-    width: 100%; height: 150px; padding: 10px; margin-bottom: 10px;
+    width: 100%; height: 300px; padding: 10px; margin-bottom: 10px;
     border: 1px solid #ddd; border-radius: 4px; resize: vertical;
-    font-family: "Apple SD Gothic Neo", "Malgun Gothic", "Dotum", sans-serif;
-    box-sizing: border-box;
+    font-family: "Apple SD Gothic Neo", sans-serif; box-sizing: border-box;
 }
-.action-btn {
-    background-color: #333; color: white; border: none; padding: 10px;
-    cursor: pointer; width: 100%; border-radius: 4px;
-}
+.action-btn { width: 100%; padding: 10px; background: #333; color: white; border: none; cursor: pointer; border-radius: 4px; margin-top: 20px;}
 .btn-group { display: flex; gap: 10px; }
-.save-btn { flex: 1; background-color: #28a745; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer;}
-.cancel-btn { flex: 1; background-color: #dc3545; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer;}
+.save-btn, .cancel-btn { flex: 1; padding: 10px; color: white; border: none; cursor: pointer; border-radius: 4px; }
+.save-btn { background: #28a745; }
+.cancel-btn { background: #dc3545; }
 
-/* 공통 팝업 스타일 */
+/* 팝업 */
 #lexicon-modal, #search-result-modal {
-    position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%;
+    position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%;
     background-color: rgba(0, 0, 0, 0.5); justify-content: center; align-items: center;
 }
 #modal-content, #search-modal-content {
-    background-color: #fff; padding: 20px; border-radius: 8px; width: 80%; max-width: 600px;
-    position: relative; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-    max-height: 80vh; overflow-y: auto; /* 내용 많으면 스크롤 */
+    background: #fff; padding: 20px; border-radius: 8px; width: 80%; max-width: 600px;
+    position: relative; max-height: 80vh; overflow-y: auto;
 }
 #modal-close-button, #search-close-button {
     position: absolute; top: 10px; right: 15px; font-size: 24px; cursor: pointer; color: #888;
 }
-
-/* 검색 결과 리스트 스타일 */
-.search-item {
-    padding: 10px; border-bottom: 1px solid #eee; cursor: pointer;
-}
-.search-item:hover { background-color: #f9f9f9; }
-.search-ref { font-weight: bold; color: #007bff; margin-bottom: 5px; }
-.search-text { font-size: 0.95rem; color: #555; }
+.search-item { padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; }
+.search-item:hover { background: #f9f9f9; }
