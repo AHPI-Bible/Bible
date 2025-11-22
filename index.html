@@ -22,7 +22,18 @@
 
         <aside id="commentary-area">
             <h2>AHPI 주석</h2>
+            
             <div id="commentary-display"></div>
+            
+            <button id="edit-btn" class="action-btn">주석 작성 / 수정</button>
+
+            <div id="editor-container" style="display: none;">
+                <textarea id="commentary-input" placeholder="여기에 주석을 작성하세요..."></textarea>
+                <div class="btn-group">
+                    <button id="save-btn" class="save-btn">저장</button>
+                    <button id="cancel-btn" class="cancel-btn">취소</button>
+                </div>
+            </div>
         </aside>
     </main>
 
