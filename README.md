@@ -11,3 +11,5 @@ Sefaria API와 AHPI 자체 데이터베이스를 결합하여 만든 하이브�
 - Frontend: HTML, CSS, JavaScript
 - Backend: Python (Flask)
 - Data Source: Sefaria API (Public), Local CSV (Korean Text)
+## 업데이트 테스트
+이 줄은 연결 테스트를 위해 추가했습니다.
