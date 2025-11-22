@@ -26,9 +26,9 @@ header h1 { margin: 0; font-size: 1.8rem; line-height: 1.2; }
     padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; cursor: pointer;
 }
 
-/* [수정됨] 드롭다운 너비 조정 */
-.book-dropdown { width: 100px; } /* 구약/신약 */
-#chapter-select { width: 60px; margin-left: 5px; }
+/* 드롭다운 스타일 */
+.book-dropdown { width: 120px; } /* 구약/신약 목록 */
+#chapter-select { width: 70px; margin-left: 5px; } /* 장 번호 */
 
 .nav-btn, .go-btn {
     color: white; border: none; padding: 8px 12px; cursor: pointer; border-radius: 4px; font-size: 0.9rem;
@@ -53,14 +53,14 @@ header h1 { margin: 0; font-size: 1.8rem; line-height: 1.2; }
 #bible-area { flex: 3; }
 #commentary-area { flex: 2; }
 
-/* 패널 헤더 & 내용 */
+/* 패널 헤더 */
 .panel-header {
     padding: 10px 15px; background: #f8f9fa; border-bottom: 1px solid #eee;
     font-weight: bold; color: #555; font-size: 1.1rem;
 }
 .scrollable-content { flex: 1; overflow-y: auto; padding: 15px; }
 
-/* 성경 본문 리스트 */
+/* 성경 리스트 */
 .verse-item {
     padding: 15px; border-bottom: 1px solid #eee; cursor: pointer;
     transition: background-color 0.2s;
@@ -75,7 +75,7 @@ header h1 { margin: 0; font-size: 1.8rem; line-height: 1.2; }
 .hebrew-word { cursor: pointer; text-decoration: underline; text-decoration-color: #ccc; }
 .hebrew-word:hover { background-color: #ddd; color: blue; }
 
-/* 주해 에디터 */
+/* 에디터 */
 #commentary-display { white-space: pre-wrap; line-height: 1.8; font-size: 1.1rem; min-height: 100px; }
 textarea {
     width: 100%; height: 300px; padding: 10px; margin-bottom: 10px;
