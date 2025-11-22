@@ -1,7 +1,7 @@
-// Render 서버 주소
+// Render 서버 주소 (한글/주석용)
 const AHPI_API_BASE_URL = "https://ahpi-bible-backend.onrender.com/api";
 
-// 성경 데이터
+// 성경 데이터 (장수 정보)
 const BIBLE_DATA = {
     "Genesis": 50, "Exodus": 40, "Leviticus": 27, "Numbers": 36, "Deuteronomy": 34,
     "Joshua": 24, "Judges": 21, "Ruth": 4, "1 Samuel": 31, "2 Samuel": 24, "1 Kings": 22, "2 Kings": 25, "1 Chronicles": 29, "2 Chronicles": 36, "Ezra": 10, "Nehemiah": 13, "Esther": 10,
@@ -14,6 +14,7 @@ const BIBLE_DATA = {
     "Hebrews": 13, "James": 5, "1 Peter": 5, "2 Peter": 3, "1 John": 5, "2 John": 1, "3 John": 1, "Jude": 1, "Revelation": 22
 };
 
+// 신약 성경 목록 (순서 중요! 마태복음이 0번 인덱스)
 const NT_BOOKS = [
     "Matthew", "Mark", "Luke", "John", "Acts", "Romans", "1 Corinthians", "2 Corinthians", 
     "Galatians", "Ephesians", "Philippians", "Colossians", "1 Thessalonians", "2 Thessalonians", 
@@ -60,7 +61,7 @@ document.addEventListener("DOMContentLoaded", function() {
     fetchHybridText(currentBook, currentChapter, currentVerse);
 });
 
-// --- 데이터 로드 핵심 로직 ---
+// --- 데이터 로드 핵심 로직 (Bolls API 적용) ---
 async function fetchHybridText(book, chapter, verse) {
     currentBook = book;
     currentChapter = chapter;
@@ -81,29 +82,27 @@ async function fetchHybridText(book, chapter, verse) {
     let originalTextPromise;
     
     if (NT_BOOKS.includes(book)) {
-        // [신약]
-        // 영어: Bible-Api (WEB 버전)
-        const englishPromise = fetch(`https://bible-api.com/${book}+${chapter}:${verse}?translation=web`).then(res => res.json());
+        // [신약] Bolls Bible API 사용
+        // 마태복음(Index 0) -> ID 40 ... 요한계시록 -> ID 66
+        const bookId = NT_BOOKS.indexOf(book) + 40;
         
-        // [수정됨] 헬라어: Sefaria (SBL Greek New Testament 버전) - 여기가 훨씬 안정적임
-        const greekPromise = fetch(`https://www.sefaria.org/api/texts/${book}.${chapter}.${verse}?version=SBL_Greek_New_Testament`)
-            .then(res => {
-                if (!res.ok) return { text: "" }; // 에러나면 빈 값
-                return res.json();
-            })
-            .catch(() => ({ text: "" }));
-
+        // 영어 (WEB 버전)
+        const englishPromise = fetch(`https://bolls.life/get-verse/WEB/${bookId}/${chapter}/${verse}/`)
+            .then(res => res.json());
+        
+        // 헬라어 (SBLGNT 버전)
+        const greekPromise = fetch(`https://bolls.life/get-verse/SBL/${bookId}/${chapter}/${verse}/`)
+            .then(res => res.json());
+        
         originalTextPromise = Promise.all([englishPromise, greekPromise]).then(([enData, grData]) => {
-            // Sefaria는 text 필드에 헬라어를 담아 보냄 (배열일 수도 있음)
-            let greekText = Array.isArray(grData.text) ? grData.text.join(" ") : (grData.text || "헬라어 본문 없음");
-            
-            // HTML 태그 제거 (혹시 있을 경우)
-            greekText = greekText.replace(/<[^>]*>?/gm, '');
+            // Bolls API는 HTML 태그를 포함할 수 있으므로 제거 정제
+            const cleanGreek = grData.text ? grData.text.replace(/<[^>]*>?/gm, '') : "헬라어 본문 없음";
+            const cleanEnglish = enData.text ? enData.text.replace(/<[^>]*>?/gm, '') : "영어 본문 없음";
 
             return {
-                text: enData.text || "영어 본문 없음",
-                he: greekText, 
-                next: null,
+                text: cleanEnglish,
+                he: cleanGreek, // 'he' 변수에 헬라어 저장
+                next: null, 
                 prev: null
             };
         });
@@ -123,16 +122,28 @@ async function fetchHybridText(book, chapter, verse) {
         const englishText = textData.text || "";
         const originalText = textData.he || ""; 
 
+        // 다음/이전 절 계산
         nextRef = textData.next || null;
         prevRef = textData.prev || null;
         
-        // 신약 등 next 정보 없을 때 수동 계산
         if (!nextRef) nextRef = `${book} ${chapter}:${verse + 1}`;
         if (!prevRef && verse > 1) prevRef = `${book} ${chapter}:${verse - 1}`;
 
-        // 신약 절 개수 확인 (Sefaria 이용)
-        if (!NT_BOOKS.includes(book)) {
-             fetch(`https://www.sefaria.org/api/texts/${book}.${chapter}?context=0&pad=0`)
+        // 신약 절 개수 확인 (Bolls API 이용)
+        // Bolls는 '장 전체'를 가져오는 것이 매우 빠름
+        if (NT_BOOKS.includes(book)) {
+            const bookId = NT_BOOKS.indexOf(book) + 40;
+            fetch(`https://bolls.life/get-chapter/SBL/${bookId}/${chapter}/`)
+                .then(res => res.json())
+                .then(chapterData => {
+                    // chapterData는 절들의 배열임 -> 배열 길이가 곧 절의 개수
+                    if(Array.isArray(chapterData)) {
+                        updateVerseOptions(chapterData.length);
+                    }
+                });
+        } else {
+            // 구약 (Sefaria)
+            fetch(`https://www.sefaria.org/api/texts/${book}.${chapter}?context=0&pad=0`)
                 .then(res => res.json())
                 .then(chapterData => {
                     if(chapterData && chapterData.text) updateVerseOptions(chapterData.text.length);
@@ -157,7 +168,8 @@ async function fetchHybridText(book, chapter, verse) {
     }
 }
 
-// --- 검색 기능 ---
+// --- (이하 기존 코드 동일) ---
+
 async function performSearch() {
     const query = document.getElementById("search-input").value;
     if (query.length < 2) {
@@ -199,7 +211,6 @@ window.goToSearchResult = function(book, chapter, verse) {
     fetchHybridText(book, chapter, verse);
 };
 
-// --- 초기화 및 이동 로직 ---
 function initSelectors() {
     const bookSelect = document.getElementById("book-select");
     BOOK_NAMES.forEach(book => {
@@ -314,7 +325,7 @@ async function saveCommentary() {
             body: JSON.stringify({ book: currentBook, chapter: currentChapter, verse: currentVerse, content: content })
         });
         if (response.ok) {
-            alert("저장 완료");
+            alert("주석이 저장되었습니다!");
             document.getElementById('commentary-display').innerText = content;
             resetEditorMode();
         } else alert("저장 실패");
@@ -328,7 +339,9 @@ function makeHebrewWordsClickable() {
     const words = hebrewElement.textContent.split(/\s+/).filter(w => w.length > 0);
     let htmlContent = '';
     words.forEach(word => {
-        if (/[\u0590-\u05FF]/.test(word)) {
+        // 신약 헬라어도 클릭 가능하게 처리 (일단은 사전 연동 없이 단어 분리만)
+        // 헬라어 유니코드 범위: \u0370-\u03FF \u1F00-\u1FFF
+        if (/[\u0590-\u05FF]/.test(word) || /[\u0370-\u03FF\u1F00-\u1FFF]/.test(word)) {
             htmlContent += `<span class="hebrew-word" data-word="${word}">${word}</span> `;
         } else {
             htmlContent += `${word} `;
@@ -342,6 +355,15 @@ function makeHebrewWordsClickable() {
 
 async function handleWordClick(event) {
     const word = event.target.dataset.word;
+    // 헬라어인지 히브리어인지 판별
+    const isGreek = /[\u0370-\u03FF\u1F00-\u1FFF]/.test(word);
+    
+    if (isGreek) {
+        // 헬라어 사전은 아직 연동 안 됨 (추후 과제)
+        alert(`헬라어 단어 "${word}" 클릭됨\n(현재 Sefaria 헬라어 사전 API는 지원되지 않습니다)`);
+        return;
+    }
+
     const modal = document.getElementById("lexicon-modal");
     const modalBody = document.getElementById("modal-body");
     modalBody.innerHTML = `<p>검색 중...</p>`;
