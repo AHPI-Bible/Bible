@@ -7,7 +7,9 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)
 
-# 1. 한글 성경 데이터 로드
+# ==========================================
+# 1. 한글 성경 데이터 로드 (CSV 파일)
+# ==========================================
 print("한글 성경 데이터를 메모리로 로드합니다...")
 BIBLE_CSV_FILE = 'korean_bible.csv'
 bible_data_in_memory = {}
@@ -19,13 +21,20 @@ try:
     with open(csv_path, 'r', encoding='utf-8') as f:
         reader = csv.DictReader(f)
         for row in reader:
+            # 데이터 유효성 검사 (필수 항목이 비어있으면 건너뜀)
+            if not row['book_name'] or not row['chapter_num'] or not row['verse_num']:
+                continue
+                
             key = f"{row['book_name']}-{row['chapter_num']}-{row['verse_num']}"
             bible_data_in_memory[key] = row['korean_text']
+            
     print(f"성경 로드 완료: {len(bible_data_in_memory)}절")
 except Exception as e:
-    print(f"CSV 로드 중 오류: {e}")
+    print(f"CSV 로드 중 오류 (데이터가 없을 수 있음): {e}")
 
-# 2. DB 연결 및 초기화
+# ==========================================
+# 2. 데이터베이스(금고) 연결 및 초기화
+# ==========================================
 def get_db_connection():
     conn = psycopg2.connect(os.environ['DATABASE_URL'])
     return conn
@@ -47,14 +56,16 @@ def init_db():
         conn.commit()
         cur.close()
         conn.close()
-        print("DB 초기화 완료")
+        print("DB 초기화 완료: 주석 테이블 준비됨")
     except Exception as e:
-        print(f"DB 초기화 실패: {e}")
+        print(f"DB 초기화 실패 (DB URL 확인 필요): {e}")
 
 with app.app_context():
     init_db()
 
-# 3. API 라우트
+# ==========================================
+# 3. API 라우트 (창구)
+# ==========================================
 
 @app.route('/api/get_data/<book_name>/<int:chapter_num>/<int:verse_num>', methods=['GET'])
 def get_ahpi_data(book_name, chapter_num, verse_num):
@@ -78,7 +89,7 @@ def get_ahpi_data(book_name, chapter_num, verse_num):
         conn.close()
     except Exception as e:
         print(f"DB 읽기 오류: {e}")
-        commentary = "오류 발생"
+        commentary = "주석을 불러오는 중 오류가 발생했습니다."
 
     return jsonify({
         'korean_text': korean_text,
@@ -105,11 +116,12 @@ def save_commentary():
         conn.commit()
         cur.close()
         conn.close()
-        return jsonify({"message": "저장 성공"}), 200
+        return jsonify({"message": "주석이 성공적으로 저장되었습니다."}), 200
     except Exception as e:
+        print(f"저장 실패: {e}")
         return jsonify({"error": str(e)}), 500
 
-# [NEW] 검색 기능 추가
+# [수정됨] 안전해진 검색 기능
 @app.route('/api/search', methods=['GET'])
 def search_bible():
     query = request.args.get('q', '')
@@ -118,21 +130,36 @@ def search_bible():
 
     results = []
     count = 0
-    # 메모리에 있는 성경 전체를 뒤짐
-    for key, text in bible_data_in_memory.items():
-        if query in text:
-            # key 형식: "Genesis-1-1"
-            parts = key.split('-')
-            results.append({
-                "book": parts[0],
-                "chapter": int(parts[1]),
-                "verse": int(parts[2]),
-                "text": text
-            })
-            count += 1
-            # 너무 많으면 브라우저 멈춤 방지 (최대 100개만)
-            if count >= 100:
-                break
+    
+    try:
+        # 메모리에 있는 성경 전체를 뒤짐
+        for key, text in bible_data_in_memory.items():
+            if query in text:
+                try:
+                    # key 형식: "Genesis-1-1" 분해 시도
+                    parts = key.split('-')
+                    
+                    # [안전장치] 키 형식이 이상하면 건너뜀
+                    if len(parts) != 3: 
+                        continue
+                        
+                    results.append({
+                        "book": parts[0],
+                        "chapter": int(parts[1]),
+                        "verse": int(parts[2]),
+                        "text": text
+                    })
+                    count += 1
+                    # 결과가 너무 많으면 100개까지만 (성능 보호)
+                    if count >= 100:
+                        break
+                except ValueError:
+                    # 숫자로 변환 안 되는 데이터가 있으면 무시하고 계속 진행
+                    continue
+                    
+    except Exception as e:
+        print(f"검색 중 서버 오류: {e}")
+        return jsonify({"error": "검색 중 오류가 발생했습니다."}), 500
     
     return jsonify({"results": results, "count": count})
 
