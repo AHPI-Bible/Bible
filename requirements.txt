@@ -1,3 +1,7 @@
 Flask
 flask-cors
 gunicorn
+Flask
+flask-cors
+gunicorn
+psycopg2-binary
