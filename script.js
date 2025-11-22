@@ -314,11 +314,136 @@ async function saveCommentary() {
     finally { btn.innerText = "저장"; }
 }
 
-// --- 단어 클릭 (사전) ---
+// --- [수정됨] 단어 클릭 기능 및 사전 연동 ---
+
+// 1. 히브리어/헬라어 단어에 클릭 이벤트 심기
 function makeHebrewWordsClickable() {
+    const hebrewElement = document.querySelector(".hebrew-text");
+    if (!hebrewElement) return;
+    
+    // 텍스트를 공백으로 분리
+    const words = hebrewElement.textContent.split(/\s+/).filter(w => w.length > 0);
+    let htmlContent = '';
+    
+    words.forEach(word => {
+        // 히브리어 또는 헬라어인지 확인 (유니코드 범위 체크)
+        // 히브리어: \u0590-\u05FF, 헬라어: \u0370-\u03FF 등
+        if (/[\u0590-\u05FF]/.test(word) || /[\u0370-\u03FF\u1F00-\u1FFF]/.test(word)) {
+            // 따옴표나 문장부호(.,:;)를 미리 제거하고 데이터에 담음
+            const cleanData = word.replace(/['".,;:]/g, '');
+            htmlContent += `<span class="hebrew-word" data-word="${cleanData}">${word}</span> `;
+        } else {
+            htmlContent += `${word} `;
+        }
+    });
+    
+    hebrewElement.innerHTML = htmlContent;
+    
+    // 이벤트 리스너 연결
     document.querySelectorAll('.hebrew-word').forEach(span => {
         span.addEventListener('click', handleWordClick);
     });
 }
+
+// 2. [핵심 수정] 단어 클릭 시 팝업 처리
 async function handleWordClick(event) {
     const rawWord = event.target.dataset.word;
+    const modal = document.getElementById("lexicon-modal");
+    const modalBody = document.getElementById("modal-body");
+    
+    // 팝업 열기
+    modal.style.display = "flex"; 
+    modalBody.innerHTML = `<p style="color:#666; font-size:1.2rem;">🔍 '${rawWord}' 검색 중...</p>`;
+
+    // 언어 감지 (히브리어인지?)
+    const isHebrew = /[\u0590-\u05FF]/.test(rawWord);
+
+    if (isHebrew) {
+        // --- [히브리어] Sefaria 사전 검색 ---
+        try {
+            // 1. 검색을 위해 장식 기호(트로프/니쿠드) 제거 -> 자음만 남김
+            // (Sefaria는 자음만으로 검색할 때 결과가 가장 잘 나옴)
+            const strippedWord = rawWord.replace(/[\u0591-\u05C7]/g, '');
+            
+            // 2. API 호출
+            const res = await fetch(`https://www.sefaria.org/api/words/${strippedWord}`);
+            if (!res.ok) throw new Error("API 오류");
+            
+            const data = await res.json();
+            console.log("Sefaria Data:", data); // 디버깅용 확인
+
+            // 3. 결과 처리 (undefined 방지 로직)
+            // Sefaria는 결과를 배열(Array)로 줍니다.
+            if (Array.isArray(data) && data.length > 0) {
+                // 가장 첫 번째 결과가 정확도가 높음
+                const entry = data[0]; 
+                
+                // 제목 표시 (히브리어 단어)
+                // entry.hebrew가 없으면 우리가 검색한 단어(strippedWord)를 보여줌
+                let html = `<h3 dir="rtl" style="font-size:2rem; color:#007bff; margin-bottom:10px;">
+                                ${entry.hebrew || strippedWord}
+                            </h3>`;
+                
+                // 기본형(Root) 표시
+                if (entry.headword) {
+                    html += `<p style="color:#555; font-weight:bold;">기본형(Root): ${entry.headword}</p>`;
+                }
+                
+                // 뜻풀이 (Definitions)
+                if (entry.senses && entry.senses.length > 0) {
+                    html += "<ul style='text-align:left; margin-top:10px;'>";
+                    entry.senses.forEach(sense => {
+                        // 뜻이 있는 경우만 리스트에 추가
+                        if (sense.definition) {
+                            html += `<li style="margin-bottom:5px;">${sense.definition}</li>`;
+                        }
+                    });
+                    html += "</ul>";
+                } else {
+                    html += "<p>상세 정의를 찾을 수 없습니다.</p>";
+                }
+                
+                modalBody.innerHTML = html;
+            } else {
+                // 결과가 텅 비었을 때 (BibleHub 링크 제공)
+                modalBody.innerHTML = `
+                    <h3 dir="rtl" style="font-size:2rem; color:#333;">${rawWord}</h3>
+                    <p style="color:red;">Sefaria 사전에 결과가 없습니다.</p>
+                    <hr style="margin:15px 0; border:0; border-top:1px solid #eee;">
+                    <a href="https://biblehub.com/hebrew/${strippedWord}.htm" target="_blank" 
+                       style="display:block; padding:12px; background:#f8f9fa; border-radius:8px; text-decoration:none; color:#007bff; font-weight:bold; text-align:center; border:1px solid #ddd;">
+                       📘 BibleHub에서 더 자세히 보기 ↗
+                    </a>
+                `;
+            }
+        } catch (e) {
+            console.error(e);
+            modalBody.innerHTML = `<p>사전 데이터를 불러오는 중 오류가 발생했습니다.</p>`;
+        }
+
+    } else {
+        // --- [헬라어] 외부 사전 링크 제공 ---
+        // 헬라어는 문법 변화가 심해서 무료 API로는 정확한 뜻을 찾기 어렵습니다.
+        // 전문 사전 사이트(BibleHub)로 연결해주는 것이 가장 확실합니다.
+        
+        const cleanGreek = rawWord.replace(/[.,;·]/g, ''); // 문장부호 제거
+        
+        let html = `<h3 style="font-size:1.8rem; margin-bottom:10px;">${rawWord}</h3>`;
+        html += `<p style="color:#666;">헬라어 단어입니다.<br>상세 의미는 아래 전문 사전에서 확인하세요.</p>`;
+        html += `<div style="display:flex; flex-direction:column; gap:10px; margin-top:20px;">`;
+        
+        html += `<a href="https://biblehub.com/greek/${cleanGreek}.htm" target="_blank" 
+                    style="padding:12px; background:#f1f3f5; border-radius:8px; text-decoration:none; color:#333; font-weight:bold; text-align:center; border:1px solid #ddd;">
+                    📘 BibleHub 사전 ↗
+                 </a>`;
+                 
+        html += `<a href="https://www.billmounce.com/greek-dictionary?search=${cleanGreek}" target="_blank" 
+                    style="padding:12px; background:#f1f3f5; border-radius:8px; text-decoration:none; color:#333; font-weight:bold; text-align:center; border:1px solid #ddd;">
+                    📗 Bill Mounce 사전 ↗
+                 </a>`;
+        
+        html += `</div>`;
+        
+        modalBody.innerHTML = html;
+    }
+}
