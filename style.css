@@ -27,7 +27,7 @@ header h1 { margin: 0; font-size: 1.8rem; line-height: 1.2; }
 }
 
 /* [수정됨] 드롭다운 너비 조정 */
-.book-dropdown { width: 110px; } /* 구약/신약 각각 */
+.book-dropdown { width: 100px; } /* 구약/신약 */
 #chapter-select { width: 60px; margin-left: 5px; }
 
 .nav-btn, .go-btn {
