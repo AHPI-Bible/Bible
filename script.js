@@ -1,3 +1,4 @@
+// Render 서버 주소
 const AHPI_API_BASE_URL = "https://ahpi-bible-backend.onrender.com/api";
 
 const BIBLE_DATA = {
@@ -39,6 +40,7 @@ function setupEventListeners() {
         document.getElementById("verse-select").value = 1;
     };
     document.getElementById("verse-select").onchange = function() { selectVerse(parseInt(this.value)); };
+    
     const editBtn = document.getElementById("edit-btn");
     const saveBtn = document.getElementById("save-btn");
     const cancelBtn = document.getElementById("cancel-btn");
@@ -57,54 +59,61 @@ async function fetchChapter(book, chapter) {
     const bibleList = document.getElementById("bible-list");
     bibleList.innerHTML = "<p>데이터를 불러오는 중입니다...</p>";
     
-    // 1. AHPI 서버 (한글 + 주해 + **헬라어**)
-    // 이제 헬라어도 우리 서버에서 줍니다.
+    // 1. AHPI 서버 (한글 + 주해 + 헬라어 + 히브리어)
     const ahpiPromise = fetch(`${AHPI_API_BASE_URL}/get_chapter_data/${book}/${chapter}`).then(res => res.json());
 
-    // 2. 외부 API (영어 + 구약 히브리어)
+    // 2. 외부 API (영어만 필요함)
     let externalPromise;
     const isNT = NT_BOOKS.includes(book);
 
     if (isNT) {
-        // [신약] 영어는 Bible-api, 헬라어는 우리 서버 사용
-        const engP = fetch(`https://bible-api.com/${book}+${chapter}?translation=web`).then(res => res.json());
-        // 외부 헬라어는 이제 안 부릅니다 (우리 서버에 있으니까!)
-        externalPromise = engP.then(en => ({
-            en: en.verses || [],
-            he: null // 헬라어는 ahpiData에서 가져옴
-        })).catch(()=>({en:[], he:null}));
+        // 신약: Bible-Api (영어)
+        externalPromise = fetch(`https://bible-api.com/${book}+${chapter}?translation=web`)
+            .then(res => res.json())
+            .then(data => data.verses || [])
+            .catch(() => []);
     } else {
-        // [구약] Sefaria (히브리어 + 영어)
-        externalPromise = fetch(`https://www.sefaria.org/api/texts/${book}.${chapter}?context=0`).then(res => res.json());
+        // 구약: Sefaria (영어만 가져옴 - Sefaria는 빠름)
+        // (참고: 구약 영어도 나중에 CSV로 만들면 완전 독립 가능)
+        externalPromise = fetch(`https://www.sefaria.org/api/texts/${book}.${chapter}?context=0`)
+            .then(res => res.json())
+            .then(data => data.text || [])
+            .catch(() => []);
     }
 
     try {
-        const [ahpiData, extData] = await Promise.all([ahpiPromise, externalPromise]);
+        const [ahpiData, engData] = await Promise.all([ahpiPromise, externalPromise]);
         
-        loadedChapterData.korean = ahpiData.korean_verses;
-        loadedChapterData.commentaries = ahpiData.commentaries;
-        // [NEW] 서버에서 받은 헬라어 데이터
-        const greekFromOurServer = ahpiData.greek_verses || {}; 
+        loadedChapterData.korean = ahpiData.korean_verses || {};
+        loadedChapterData.commentaries = ahpiData.commentaries || {};
         
-        if (isNT) {
-            // 신약 데이터 조립
-            loadedChapterData.english = extData.en.map(v => v.text.replace(/<[^>]*>?/gm, '')); 
-            
-            // 헬라어: 서버에서 받은 딕셔너리 {1: "텍스트", 2: "..."} 를 배열로 변환
-            // (화면 그리기 편하게)
-            const maxV = Object.keys(greekFromOurServer).length;
-            loadedChapterData.original = [];
-            for(let i=1; i<=maxV; i++) {
-                loadedChapterData.original.push(greekFromOurServer[i] || "");
+        // 원어 데이터 (구약이면 히브리어, 신약이면 헬라어)
+        const serverGreek = ahpiData.greek_verses || {};
+        const serverHebrew = ahpiData.hebrew_verses || {};
+        
+        loadedChapterData.original = [];
+        
+        // 화면 표시용 배열 만들기
+        // (절 번호 1부터 176까지 순회하며 데이터 채움)
+        const maxVerse = Object.keys(loadedChapterData.korean).length || 50;
+        
+        for(let i=1; i<=maxVerse; i++) {
+            if (isNT) {
+                loadedChapterData.original.push(serverGreek[i] || "");
+            } else {
+                loadedChapterData.original.push(serverHebrew[i] || "");
             }
+        }
+
+        // 영어 데이터 포맷팅
+        if (isNT) {
+            loadedChapterData.english = engData.map(v => v.text.replace(/<[^>]*>?/gm, ''));
         } else {
-            // 구약 데이터 (Sefaria)
-            loadedChapterData.english = extData.text || [];
-            loadedChapterData.original = extData.he || [];
+            loadedChapterData.english = engData; // Sefaria는 이미 문자열 배열
         }
 
         renderBibleList();
-        updateVerseOptions(Math.max(Object.keys(loadedChapterData.korean).length, loadedChapterData.english.length));
+        updateVerseOptions(maxVerse);
         selectVerse(1);
 
     } catch (error) {
@@ -113,10 +122,11 @@ async function fetchChapter(book, chapter) {
     }
 }
 
+// 리스트 그리기
 function renderBibleList() {
     const list = document.getElementById("bible-list");
     list.innerHTML = "";
-    const maxVerse = Math.max(Object.keys(loadedChapterData.korean).length, loadedChapterData.english.length);
+    const maxVerse = Object.keys(loadedChapterData.korean).length;
 
     if (maxVerse === 0) {
         list.innerHTML = "<p>본문이 없습니다.</p>";
@@ -137,7 +147,7 @@ function renderBibleList() {
         html += `<span class="korean-text">${kor}</span>`;
         html += `<span class="english-text">${eng}</span>`;
         
-        // 원어 단어 처리
+        // 원어 단어 처리 (클릭 이벤트)
         const oriWords = ori.replace(/<[^>]*>?/gm, '').split(/\s+/);
         let oriHtml = "";
         oriWords.forEach(w => {
@@ -150,6 +160,7 @@ function renderBibleList() {
     }
 }
 
+// (나머지 함수들은 기존과 동일)
 function selectVerse(verseNum) {
     currentVerse = verseNum;
     document.querySelectorAll(".verse-item").forEach(el => el.classList.remove("selected"));
@@ -164,7 +175,6 @@ function selectVerse(verseNum) {
     closeEditor();
     document.getElementById("verse-select").value = verseNum;
 }
-
 function openEditor() {
     const displayDiv = document.getElementById("commentary-display");
     const input = document.getElementById("commentary-input");
@@ -173,13 +183,11 @@ function openEditor() {
     document.getElementById("edit-btn").style.display = "none";
     document.getElementById("editor-container").style.display = "block";
 }
-
 function closeEditor() {
     document.getElementById("editor-container").style.display = "none";
     document.getElementById("commentary-display").style.display = "block";
     document.getElementById("edit-btn").style.display = "block";
 }
-
 async function saveCommentary() {
     const content = document.getElementById("commentary-input").value;
     const btn = document.getElementById("save-btn");
@@ -200,14 +208,12 @@ async function saveCommentary() {
     } catch(e) { alert("오류 발생"); }
     finally { btn.innerText = "저장"; }
 }
-
 window.openLexicon = async function(event, word) {
     event.stopPropagation(); 
     const modal = document.getElementById("lexicon-modal");
     const body = document.getElementById("modal-body");
     body.innerHTML = "검색 중...";
     modal.style.display = "flex";
-    
     try {
         const res = await fetch(`https://www.sefaria.org/api/words/${word}`);
         const data = await res.json();
@@ -217,7 +223,6 @@ window.openLexicon = async function(event, word) {
         body.innerHTML = html;
     } catch(e) { body.innerHTML = "<p>정보 없음</p>"; }
 };
-
 function updateChapterOptions(bookName) {
     const sel = document.getElementById("chapter-select");
     sel.innerHTML = "";
@@ -269,15 +274,12 @@ function navigateManual() {
 async function performSearch() {
     const q = document.getElementById("search-input").value;
     if(q.length<2) return alert("2글자 이상 입력");
-    
     const modal = document.getElementById("search-result-modal");
     const body = document.getElementById("search-results-body");
     body.innerHTML = "검색 중...";
     modal.style.display = "flex";
-    
     const res = await fetch(`${AHPI_API_BASE_URL}/search?q=${encodeURIComponent(q)}`);
     const data = await res.json();
-    
     if(data.results?.length) {
         body.innerHTML = data.results.map(item => 
             `<div class="search-item" onclick="goToSearchResult('${item.book}', ${item.chapter}, ${item.verse})">
