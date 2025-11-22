@@ -1,7 +1,7 @@
 // Render 서버 주소
 const AHPI_API_BASE_URL = "https://ahpi-bible-backend.onrender.com/api";
 
-// [핵심] 성경 66권 이름과 '총 장(Chapter) 수' 데이터
+// 성경 66권 이름과 '총 장(Chapter) 수' 데이터
 const BIBLE_DATA = {
     "Genesis": 50, "Exodus": 40, "Leviticus": 27, "Numbers": 36, "Deuteronomy": 34,
     "Joshua": 24, "Judges": 21, "Ruth": 4, "1 Samuel": 31, "2 Samuel": 24, "1 Kings": 22, "2 Kings": 25, "1 Chronicles": 29, "2 Chronicles": 36, "Ezra": 10, "Nehemiah": 13, "Esther": 10,
@@ -19,31 +19,39 @@ const BOOK_NAMES = Object.keys(BIBLE_DATA);
 let currentBook = "Genesis";
 let currentChapter = 1;
 let currentVerse = 1;
+let nextRef = null;
+let prevRef = null;
 
 document.addEventListener("DOMContentLoaded", function() {
-    initSelectors(); // 드롭다운 초기화
+    initSelectors(); 
 
     document.getElementById("modal-close-button").addEventListener("click", () => {
         document.getElementById("lexicon-modal").style.display = "none";
     });
 
-    // 버튼 이벤트 (장 단위 이동)
     document.getElementById("prev-btn").addEventListener("click", goToPrevChapter);
     document.getElementById("next-btn").addEventListener("click", goToNextChapter);
     document.getElementById("go-btn").addEventListener("click", navigateManual);
 
-    // 책 선택 시 장 목록 업데이트 이벤트
+    // 책 선택 시 장 목록 업데이트
     document.getElementById("book-select").addEventListener("change", function() {
         updateChapterOptions(this.value);
+        // 책을 바꾸면 절은 일단 1절로 리셋 (데이터 로드 후 정확해짐)
+        updateVerseOptions(176); 
+        document.getElementById("verse-select").value = 1;
+    });
+
+    // 장 선택 시 절 선택 초기화
+    document.getElementById("chapter-select").addEventListener("change", function() {
+        document.getElementById("verse-select").value = 1;
     });
 
     setupEditorEvents();
     fetchHybridText(currentBook, currentChapter, currentVerse);
 });
 
-// --- [초기화] 드롭다운 메뉴 만들기 ---
 function initSelectors() {
-    // 1. 책 목록 채우기
+    // 1. 책 목록
     const bookSelect = document.getElementById("book-select");
     BOOK_NAMES.forEach(book => {
         const option = document.createElement("option");
@@ -52,25 +60,18 @@ function initSelectors() {
         bookSelect.appendChild(option);
     });
 
-    // 2. 초기 장(Chapter) 목록 채우기 (Genesis 기준)
+    // 2. 초기 장 목록
     updateChapterOptions("Genesis");
 
-    // 3. 절(Verse) 목록 채우기 (1~176절, 시편 119편 기준 넉넉하게)
-    const verseSelect = document.getElementById("verse-select");
-    for (let i = 1; i <= 176; i++) {
-        const option = document.createElement("option");
-        option.value = i;
-        option.innerText = i;
-        verseSelect.appendChild(option);
-    }
+    // 3. 초기 절 목록 (임시로 넉넉하게, 로드 후 조정됨)
+    updateVerseOptions(176);
 }
 
-// 책을 바꾸면 -> 그 책의 장(Chapter) 수만큼 드롭다운을 다시 만듦
 function updateChapterOptions(bookName) {
     const chapterSelect = document.getElementById("chapter-select");
     const maxChapters = BIBLE_DATA[bookName] || 50;
     
-    chapterSelect.innerHTML = ""; // 기존 목록 비우기
+    chapterSelect.innerHTML = ""; 
     
     for (let i = 1; i <= maxChapters; i++) {
         const option = document.createElement("option");
@@ -78,24 +79,40 @@ function updateChapterOptions(bookName) {
         option.innerText = i;
         chapterSelect.appendChild(option);
     }
-    // 책이 바뀌면 1장으로 리셋
     chapterSelect.value = 1;
 }
 
-// --- [이동 로직] 다음 장 / 이전 장 ---
+// [NEW] 절(Verse) 드롭다운을 실제 절 수에 맞춰 다시 그리는 함수
+function updateVerseOptions(maxVerses) {
+    const verseSelect = document.getElementById("verse-select");
+    const currentVal = parseInt(verseSelect.value) || 1; // 현재 선택된 값 기억
+
+    verseSelect.innerHTML = ""; // 기존 목록 비우기
+
+    for (let i = 1; i <= maxVerses; i++) {
+        const option = document.createElement("option");
+        option.value = i;
+        option.innerText = i;
+        verseSelect.appendChild(option);
+    }
+
+    // 아까 선택했던 절이 범위 안에 있으면 유지, 넘치면 1절로
+    if (currentVal <= maxVerses) {
+        verseSelect.value = currentVal;
+    } else {
+        verseSelect.value = 1;
+    }
+}
 
 function goToNextChapter() {
     const maxChapters = BIBLE_DATA[currentBook];
-    
     if (currentChapter < maxChapters) {
-        // 같은 책 내에서 다음 장으로
         fetchHybridText(currentBook, currentChapter + 1, 1);
     } else {
-        // 책의 끝이면 -> 다음 책 1장 1절로
         const currentBookIndex = BOOK_NAMES.indexOf(currentBook);
         if (currentBookIndex < BOOK_NAMES.length - 1) {
             const nextBook = BOOK_NAMES[currentBookIndex + 1];
-            updateChapterOptions(nextBook); // 드롭다운 업데이트
+            updateChapterOptions(nextBook); 
             fetchHybridText(nextBook, 1, 1);
         } else {
             alert("성경의 마지막입니다.");
@@ -105,15 +122,13 @@ function goToNextChapter() {
 
 function goToPrevChapter() {
     if (currentChapter > 1) {
-        // 같은 책 내에서 이전 장으로
         fetchHybridText(currentBook, currentChapter - 1, 1);
     } else {
-        // 책의 시작이면 -> 이전 책의 마지막 장 1절로
         const currentBookIndex = BOOK_NAMES.indexOf(currentBook);
         if (currentBookIndex > 0) {
             const prevBook = BOOK_NAMES[currentBookIndex - 1];
             const prevBookMaxChapter = BIBLE_DATA[prevBook];
-            updateChapterOptions(prevBook); // 드롭다운 업데이트
+            updateChapterOptions(prevBook); 
             fetchHybridText(prevBook, prevBookMaxChapter, 1);
         } else {
             alert("성경의 시작입니다.");
@@ -121,7 +136,6 @@ function goToPrevChapter() {
     }
 }
 
-// [이동 기능] 드롭다운 선택값으로 이동
 function navigateManual() {
     const book = document.getElementById("book-select").value;
     const chapter = parseInt(document.getElementById("chapter-select").value);
@@ -130,22 +144,25 @@ function navigateManual() {
     fetchHybridText(book, chapter, verse);
 }
 
-// UI 업데이트 (현재 위치를 드롭다운에 반영)
 function updateNavUI() {
     document.getElementById("book-select").value = currentBook;
-    // 만약 장(Chapter) 드롭다운이 현재 장을 포함하지 못하면(책 변경시 등), 업데이트
+    
+    // 현재 장이 드롭다운 범위 밖이면 업데이트
     if (document.getElementById("chapter-select").options.length < currentChapter) {
         updateChapterOptions(currentBook);
     }
     document.getElementById("chapter-select").value = currentChapter;
+    
+    // (주의) 절 드롭다운 업데이트는 fetchHybridText 안에서 데이터 확인 후 실행됨
     document.getElementById("verse-select").value = currentVerse;
 }
 
-// 데이터 불러오기 (기존과 동일, UI업데이트만 추가)
 async function fetchHybridText(book, chapter, verse) {
     currentBook = book;
     currentChapter = chapter;
     currentVerse = verse;
+    
+    // UI 업데이트 (여기서는 아직 절 개수를 모름)
     updateNavUI();
 
     const displayArea = document.querySelector(".bible-text-container");
@@ -156,11 +173,44 @@ async function fetchHybridText(book, chapter, verse) {
 
     try {
         const ahpiPromise = fetch(`${AHPI_API_BASE_URL}/get_data/${book}/${chapter}/${verse}`).then(res => res.json());
+        // Sefaria API 호출
         const sefariaPromise = fetch(`https://www.sefaria.org/api/texts/${book}.${chapter}.${verse}?context=0`).then(res => res.json());
 
         const [ahpiData, sefariaData] = await Promise.all([ahpiPromise, sefariaPromise]);
         
         if (ahpiData.error || !sefariaData.text) throw new Error("데이터 오류");
+
+        nextRef = sefariaData.next; 
+        prevRef = sefariaData.prev; 
+
+        // [핵심] Sefaria 데이터에서 이 장의 총 절 수 확인
+        // Sefaria API 구조: sefariaData.text는 현재 절의 텍스트만 줌 (context=0 때문에)
+        // 하지만 드롭다운 수정을 위해 이 장 전체의 길이가 필요함.
+        // -> 이를 위해 '장 전체' 정보를 가볍게 확인하거나, 
+        // -> 더 쉬운 방법: Sefaria는 text 길이를 현재 절 1개만 줄 수 있음.
+        // -> 따라서 '절 드롭다운'을 정확히 하려면 '장 전체'를 한번 호출해서 길이를 재야 함.
+        // -> 성능을 위해 여기서는 'API 호출'을 하나 더 추가하여 '장 전체 길이'를 가져오겠습니다.
+        
+        // 장 전체 구조 가져오기 (Shape API 사용 - 매우 가벼움)
+        fetch(`https://www.sefaria.org/api/shape/${book}.${chapter}`)
+            .then(res => res.json())
+            .then(shapeData => {
+                // shapeData는 배열 형태. 예: [chapter_array] -> chapter_array의 길이가 절의 개수
+                // shapeData 구조 확인 필요. 보통 shapeData[0] 이나 shapeData 가 절의 개수를 담은 배열임.
+                // 더 확실한 방법: text-preview API 사용.
+                // 가장 확실하고 쉬운 방법: 그냥 해당 장 전체를 요청해서 길이 재기 (Sefaria는 빠름)
+                return fetch(`https://www.sefaria.org/api/texts/${book}.${chapter}?context=0&pad=0`);
+            })
+            .then(res => res.json())
+            .then(chapterData => {
+                if(chapterData && chapterData.text) {
+                    // [수정 완료] 실제 절의 개수만큼 드롭다운 업데이트
+                    updateVerseOptions(chapterData.text.length);
+                    // 드롭다운 값 다시 설정
+                    document.getElementById("verse-select").value = currentVerse;
+                }
+            });
+
 
         displayArea.innerHTML = `
             <div class="verse">
@@ -170,6 +220,7 @@ async function fetchHybridText(book, chapter, verse) {
             </div>
         `;
         commentDisplay.innerText = ahpiData.ahpi_commentary;
+        
         resetEditorMode();
         makeHebrewWordsClickable(); 
 
@@ -180,7 +231,6 @@ async function fetchHybridText(book, chapter, verse) {
     }
 }
 
-// (이하 에디터, 팝업 기능은 기존과 동일)
 function setupEditorEvents() {
     const editBtn = document.getElementById("edit-btn");
     const saveBtn = document.getElementById("save-btn");
