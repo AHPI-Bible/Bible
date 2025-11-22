@@ -1,6 +1,7 @@
 /* 기본 설정 */
 body {
-    font-family: sans-serif;
+    /* 맥(Apple SD...)과 윈도우(Malgun Gothic) 표준 폰트 지정 */
+    font-family: "Apple SD Gothic Neo", "Malgun Gothic", "Dotum", sans-serif;
     line-height: 1.6;
     margin: 0;
     background-color: #f4f4f4;
@@ -90,13 +91,10 @@ button:hover { opacity: 0.9; }
 textarea {
     width: 100%;
     height: 150px;
-    padding: 10px;
-    margin-bottom: 10px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
+    /* ... 중간 생략 ... */
     resize: vertical;
-    font-family: sans-serif;
-    box-sizing: border-box; /* 패딩 포함 크기 계산 */
+    font-family: sans-serif; /* 여기가 문제의 원인 */
+    box-sizing: border-box;
 }
 .action-btn {
     background-color: #333; color: white; border: none; padding: 10px;
