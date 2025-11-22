@@ -1,0 +1,12 @@
+# 파이썬 자동 생성 파일 무시
+__pycache__/
+*.py[cod]
+venv/
+.env
+
+# 맥/윈도우 시스템 파일 무시
+.DS_Store
+Thumbs.db
+
+# (선택사항) 만약 원본 데이터가 너무 크다면 무시 (지금은 주석 처리해둠)
+# korean_bible.csv

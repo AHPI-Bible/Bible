@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AHPI 성경 주석</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <header>
+        <h1>AHPI 성경 주해</h1>
+    </header>
+
+    <main class="container">
+        <section id="bible-area">
+            <h2>성경 본문</h2>
+            <div id="text-display">
+                <div class="bible-text-container"></div>
+            </div>
+        </section>
+
+        <aside id="commentary-area">
+            <h2>AHPI 주석</h2>
+            <div id="commentary-display"></div>
+        </aside>
+    </main>
+
+    <div id="lexicon-modal" style="display: none;">
+        <div id="modal-content">
+            <span id="modal-close-button">&times;</span>
+            <h2>단어 분석</h2>
+            <div id="modal-body"></div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+
+</body>
+</html>
