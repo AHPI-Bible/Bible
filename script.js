@@ -107,6 +107,7 @@ function updateNavUI() {
         document.getElementById("nt-select").value = currentBook;
         document.getElementById("nt-select").classList.add("active");
         document.getElementById("nt-select").classList.remove("inactive");
+        
         document.getElementById("ot-select").value = "";
         document.getElementById("ot-select").classList.add("inactive");
         document.getElementById("ot-select").classList.remove("active");
@@ -114,6 +115,7 @@ function updateNavUI() {
         document.getElementById("ot-select").value = currentBook;
         document.getElementById("ot-select").classList.add("active");
         document.getElementById("ot-select").classList.remove("inactive");
+        
         document.getElementById("nt-select").value = "";
         document.getElementById("nt-select").classList.add("inactive");
         document.getElementById("nt-select").classList.remove("active");
@@ -130,6 +132,7 @@ function navigateManual() {
     const ntVal = document.getElementById("nt-select").value;
     const book = otVal || ntVal || currentBook;
     const chapter = parseInt(document.getElementById("chapter-select").value);
+    
     fetchChapter(book, chapter);
 }
 
@@ -143,7 +146,6 @@ async function fetchChapter(book, chapter) {
     const bibleList = document.getElementById("bible-list");
     bibleList.innerHTML = "<p>데이터를 불러오는 중입니다...</p>";
     
-    // AHPI 서버 호출 (한글/영어/원어/주해 모두 포함)
     const url = `${AHPI_API_BASE_URL}/get_chapter_data/${book}/${chapter}`;
     
     try {
@@ -161,7 +163,7 @@ async function fetchChapter(book, chapter) {
         
         loadedChapterData.original = [];
         const maxVerse = Math.max(
-            Object.keys(loadedChapterData.korean).length,
+            Object.keys(loadedChapterData.korean).length, 
             Object.keys(serverGreek).length,
             Object.keys(serverHebrew).length
         );
@@ -176,7 +178,7 @@ async function fetchChapter(book, chapter) {
             }
         }
 
-        // 영어 데이터 배열 처리
+        // 영어 배열 처리
         if (!Array.isArray(loadedChapterData.english)) {
              let engArr = [];
              for(let i=1; i<=maxVerse; i++) {
@@ -210,17 +212,15 @@ function renderBibleList(maxVerse) {
         div.onclick = () => selectVerse(i); 
 
         const kor = loadedChapterData.korean[i] || "";
-        
-        // 영어 처리 (배열 안전 접근)
-        let rawEng = "";
+        // 영어
+        let eng = "";
         if (Array.isArray(loadedChapterData.english)) {
-            rawEng = loadedChapterData.english[i-1] || "";
+            eng = loadedChapterData.english[i-1] || "";
         } else {
-            rawEng = loadedChapterData.english[i] || "";
+            eng = loadedChapterData.english[i] || "";
         }
-
-        // 영어 텍스트 파싱 (스트롱 코드 처리)
-        const engHtml = renderEnglishWithStrongs(rawEng);
+        // 스트롱 코드 파싱
+        const engHtml = renderEnglishWithStrongs(eng);
 
         const ori = loadedChapterData.original[i-1] || "";
 
@@ -252,14 +252,12 @@ function renderBibleList(maxVerse) {
 // --- 영어 스트롱 코드 파싱 ---
 function renderEnglishWithStrongs(text) {
     if (!text) return "";
-    
     const parts = text.split(/\s+/);
     let resultHtml = "";
     let currentWord = "";
     
     for (let i = 0; i < parts.length; i++) {
         const part = parts[i];
-        // 스트롱 코드 태그 확인: <H1234> 또는 {H1234}
         const match = part.match(/[<{]([HG]\d+)[>}]/);
         
         if (match) {
@@ -269,15 +267,11 @@ function renderEnglishWithStrongs(text) {
                 currentWord = ""; 
             }
         } else {
-            if (currentWord) {
-                resultHtml += `${currentWord} `;
-            }
+            if (currentWord) resultHtml += `${currentWord} `;
             currentWord = part;
         }
     }
-    if (currentWord) {
-        resultHtml += `${currentWord}`;
-    }
+    if (currentWord) resultHtml += `${currentWord}`;
     return resultHtml;
 }
 
@@ -317,10 +311,136 @@ async function handleEnglishClick(event) {
                    📘 BibleHub 사전 보기 ↗
                 </a>
              </div>`;
-    
     modalBody.innerHTML = html;
 }
 
 // --- 원어 단어 클릭 ---
 function makeHebrewWordsClickable() {
-    document.querySelectorAll('.hebrew
+    document.querySelectorAll('.hebrew-word').forEach(span => {
+        span.addEventListener('click', handleWordClick);
+    });
+}
+async function handleWordClick(event) {
+    const rawWord = event.target.dataset.word;
+    const modal = document.getElementById("lexicon-modal");
+    const modalBody = document.getElementById("modal-body");
+    modal.style.display = "flex"; 
+    modalBody.innerHTML = `<p>검색 중: ${rawWord}</p>`;
+
+    const isHebrew = /[\u0590-\u05FF]/.test(rawWord);
+    const cleanWord = isHebrew ? rawWord.replace(/[\u0591-\u05C7]/g, '') : rawWord.replace(/[.,;·]/g, '');
+
+    let html = `<h3 style="font-size:1.8rem; text-align:center; color:#007bff;">${rawWord}</h3>`;
+    
+    html += `<div style="display:flex; gap:10px; justify-content:center; margin-bottom:20px;">`;
+    if (isHebrew) {
+        html += `<a href="https://dict.naver.com/heko/#/search?query=${cleanWord}" target="_blank" style="padding:8px 15px; background:#03C75A; color:white; border-radius:5px; text-decoration:none;">네이버 히브리어</a>`;
+        html += `<a href="https://biblehub.com/hebrew/${cleanWord}.htm" target="_blank" style="padding:8px 15px; background:#004085; color:white; border-radius:5px; text-decoration:none;">Bible Hub</a>`;
+    } else {
+        html += `<a href="https://dict.naver.com/grko/#/search?query=${cleanWord}" target="_blank" style="padding:8px 15px; background:#03C75A; color:white; border-radius:5px; text-decoration:none;">네이버 헬라어</a>`;
+        html += `<a href="https://biblehub.com/greek/${cleanWord}.htm" target="_blank" style="padding:8px 15px; background:#004085; color:white; border-radius:5px; text-decoration:none;">Bible Hub</a>`;
+    }
+    html += `</div>`;
+
+    if (isHebrew) {
+        try {
+            const res = await fetch(`https://www.sefaria.org/api/words/${cleanWord}`);
+            if (res.ok) {
+                const data = await res.json();
+                if (Array.isArray(data) && data.length > 0) {
+                    html += `<div style="text-align:left; background:#f8f9fa; padding:10px;"><strong>Sefaria:</strong><br>`;
+                    data.forEach((entry, idx) => {
+                        if (idx > 2) return;
+                        if(entry.senses) {
+                            entry.senses.forEach(s => { if(s.definition) html += `- ${s.definition}<br>`; });
+                        }
+                    });
+                    html += `</div>`;
+                }
+            }
+        } catch(e) {}
+    }
+    modalBody.innerHTML = html;
+}
+
+function selectVerse(verseNum) {
+    currentVerse = verseNum;
+    document.querySelectorAll(".verse-item").forEach(el => el.classList.remove("selected"));
+    const targetRow = document.getElementById(`verse-row-${verseNum}`);
+    if (targetRow) {
+        targetRow.classList.add("selected");
+        targetRow.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    document.getElementById("current-verse-display").innerText = `${KOREAN_BOOK_NAMES[currentBook]||currentBook} ${currentChapter}:${verseNum}`;
+    const comment = loadedChapterData.commentaries[verseNum];
+    document.getElementById("commentary-display").innerText = comment ? comment : "작성된 주해가 없습니다.";
+    closeEditor();
+}
+function openEditor() {
+    const displayDiv = document.getElementById("commentary-display");
+    const input = document.getElementById("commentary-input");
+    input.value = displayDiv.innerText === "작성된 주해가 없습니다." ? "" : displayDiv.innerText;
+    document.getElementById("commentary-display").style.display = "none";
+    document.getElementById("edit-btn").style.display = "none";
+    document.getElementById("editor-container").style.display = "block";
+}
+function closeEditor() {
+    document.getElementById("editor-container").style.display = "none";
+    document.getElementById("commentary-display").style.display = "block";
+    document.getElementById("edit-btn").style.display = "block";
+}
+async function saveCommentary() {
+    const content = document.getElementById("commentary-input").value;
+    const btn = document.getElementById("save-btn");
+    btn.innerText = "저장 중...";
+    try {
+        const res = await fetch(`${AHPI_API_BASE_URL}/save_commentary`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ book: currentBook, chapter: currentChapter, verse: currentVerse, content: content })
+        });
+        if (res.ok) {
+            alert("저장 완료");
+            loadedChapterData.commentaries[currentVerse] = content;
+            selectVerse(currentVerse); 
+        } else alert("저장 실패");
+    } catch(e) { alert("오류"); }
+    finally { btn.innerText = "저장"; }
+}
+function goToNextChapter() {
+    if(currentChapter < BIBLE_DATA[currentBook]) fetchChapter(currentBook, currentChapter + 1);
+    else {
+        const idx = BOOK_NAMES.indexOf(currentBook);
+        if(idx < BOOK_NAMES.length-1) fetchChapter(BOOK_NAMES[idx+1], 1);
+    }
+}
+function goToPrevChapter() {
+    if(currentChapter > 1) fetchChapter(currentBook, currentChapter - 1);
+    else {
+        const idx = BOOK_NAMES.indexOf(currentBook);
+        if(idx > 0) fetchChapter(BOOK_NAMES[idx-1], BIBLE_DATA[BOOK_NAMES[idx-1]]);
+    }
+}
+async function performSearch() {
+    const q = document.getElementById("search-input").value;
+    if(q.length<2) return alert("2글자 이상");
+    const modal = document.getElementById("search-result-modal");
+    const body = document.getElementById("search-results-body");
+    body.innerHTML = "검색 중...";
+    modal.style.display = "flex";
+    const res = await fetch(`${AHPI_API_BASE_URL}/search?q=${encodeURIComponent(q)}`);
+    const data = await res.json();
+    if(data.results?.length) {
+        body.innerHTML = data.results.map(item => 
+            `<div class="search-item" onclick="goToSearchResult('${item.book}', ${item.chapter}, ${item.verse})">
+                <div class="search-ref">${KOREAN_BOOK_NAMES[item.book] || item.book} ${item.chapter}:${item.verse}</div>
+                <div class="search-text">${item.text}</div>
+            </div>`
+        ).join("");
+    } else body.innerHTML = "결과 없음";
+}
+window.goToSearchResult = function(b, c, v) {
+    document.getElementById("search-result-modal").style.display = "none";
+    currentVerse = v; 
+    fetchChapter(b, c);
+};
