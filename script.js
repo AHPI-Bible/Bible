@@ -43,12 +43,19 @@ let tempCopyData = { kor: "", eng: "", ori: "", verse: 0 };
 let currentBibleFontSize = 100;
 let currentCommFontSize = 100;
 
+// [NEW] 레이아웃 비율 상태
+let currentLayoutIndex = 0;
+const layoutClasses = ["layout-50-50", "layout-60-40", "layout-70-30"];
+
 document.addEventListener("DOMContentLoaded", function() {
     setupEventListeners();
     loadChapter(currentBook, currentChapter, true);
     if(localStorage.getItem('theme') === 'dark') {
         document.body.classList.add('dark-mode');
     }
+    // 기본 레이아웃 설정 (60:40이 기본이라면 index 1)
+    document.body.classList.add(layoutClasses[1]);
+    currentLayoutIndex = 1;
 });
 
 function setupEventListeners() {
@@ -78,14 +85,29 @@ function setupEventListeners() {
     document.getElementById("copy-ori").onclick = () => executeCopy('ori');
 
     document.getElementById("btn-dark-mode").onclick = toggleDarkMode;
-
-    // 상단 성경 본문 폰트 버튼 삭제됨 (주석처리)
-    // document.getElementById("btn-bible-font-plus").onclick = ... 
     
     document.getElementById("btn-comm-font-plus").onclick = () => changeCommFontSize(10);
     document.getElementById("btn-comm-font-minus").onclick = () => changeCommFontSize(-10);
 
     document.getElementById("close-analysis-btn").onclick = closeAnalysisPanel;
+    
+    // [NEW] 모바일 우측 패널 닫기
+    document.getElementById("close-commentary-btn").onclick = toggleCommentary;
+
+    // [NEW] 화면 비율 버튼 이벤트
+    document.getElementById("btn-layout-toggle").onclick = toggleLayout;
+}
+
+// [NEW] 화면 비율 토글 함수
+function toggleLayout() {
+    // 현재 클래스 제거
+    document.body.classList.remove(layoutClasses[currentLayoutIndex]);
+    
+    // 다음 인덱스 계산
+    currentLayoutIndex = (currentLayoutIndex + 1) % layoutClasses.length;
+    
+    // 새 클래스 추가
+    document.body.classList.add(layoutClasses[currentLayoutIndex]);
 }
 
 function toggleDarkMode() {
@@ -111,7 +133,12 @@ function changeCommFontSize(delta) {
 
 function toggleCommentary() {
     const panel = document.getElementById("commentary-area");
-    panel.classList.toggle("show");
+    // show 클래스를 toggle (있으면 끄고, 없으면 켜고)
+    if(panel.classList.contains("show")) {
+        panel.classList.remove("show");
+    } else {
+        panel.classList.add("show");
+    }
 }
 
 function closeAnalysisPanel() {
@@ -269,18 +296,14 @@ function handleCommentaryClick(verseNum) {
     }
 }
 
-// [수정] 원전 분해 클릭 시 모바일/PC 분기 처리
 function handleAnalysisClick(book, chapter, verse) {
-    // 화면 너비가 1024px 이하(모바일/태블릿)면 좌측 패널 사용
     if (window.innerWidth <= 1024) {
         loadAnalysisToLeftPanel(book, chapter, verse);
     } else {
-        // PC면 우측 주해창 사용
         loadAnalysisToRightPanel(book, chapter, verse);
     }
 }
 
-// 좌측 패널 로드 (모바일/패드)
 async function loadAnalysisToLeftPanel(book, chapter, verse) {
     const panel = document.getElementById("analysis-panel");
     panel.classList.add("show");
@@ -289,17 +312,15 @@ async function loadAnalysisToLeftPanel(book, chapter, verse) {
     await fetchAndRenderAnalysis(book, chapter, verse, contentDiv);
 }
 
-// 우측 패널 로드 (PC)
 async function loadAnalysisToRightPanel(book, chapter, verse) {
     const panel = document.getElementById("commentary-area");
     panel.classList.add("show");
     const contentDiv = document.getElementById("commentary-display");
     contentDiv.innerHTML = "<p>원전 데이터를 분석 중입니다...</p>";
-    closeEditor(); // PC 에디터 닫기
+    closeEditor(); 
     await fetchAndRenderAnalysis(book, chapter, verse, contentDiv);
 }
 
-// 공통 데이터 로드 및 렌더링 함수
 async function fetchAndRenderAnalysis(book, chapter, verse, targetElement) {
     try {
         const res = await fetch(`${AHPI_API_BASE_URL}/analysis/${book}/${chapter}/${verse}`);
@@ -466,6 +487,8 @@ function makeHebrewWordsClickable() {
         span.addEventListener('click', (e) => { e.stopPropagation(); });
     });
 }
+
+// [수정] 원어 사전 팝업: 제목(H3) 삭제
 async function openLexiconModal(code, word) {
     const modal = document.getElementById("lexicon-modal");
     const modalBody = document.getElementById("modal-body");
@@ -473,19 +496,24 @@ async function openLexiconModal(code, word) {
     try {
         const res = await fetch(`${AHPI_API_BASE_URL}/lexicon/${code}`);
         const data = await res.json();
-        let html = `<h3 style="font-size:1.5rem; color:#007bff; text-align:center;">${word} (${code})</h3>`;
+        
+        // [변경] H3 제목 태그를 생성하지 않고 바로 내용만 표시
+        // 사용자가 원치 않는 제목 "the face (H6440)" 등이 보이지 않게 됨.
+        
         if (data.content && data.content !== "사전 데이터가 없습니다.") {
             let content = data.content;
             content = content.replace(/([^\s]+)\^/g, '<span class="lexicon-huge-word">$1</span>');
             content = content.replace(/\^/g, '');
-            html += `<div style="text-align:left; margin-top:15px; line-height:1.6; font-size:1rem;">${content}</div>`;
+            
+            // 상단 여백(margin-top)도 제거하여 바로 내용이 나오도록 함
+            modalBody.innerHTML = `<div style="text-align:left; line-height:1.6; font-size:1rem;">${content}</div>`;
         } else {
             let link = code.startsWith('H') ? `https://biblehub.com/hebrew/${code.substring(1)}.htm` : `https://biblehub.com/greek/${code.substring(1)}.htm`;
-            html += `<p style="color:red; text-align:center;">사전 데이터 없음</p><div style="text-align:center; margin-top:15px;"><a href="${link}" target="_blank" style="padding:8px; background:#eee; border-radius:5px;">BibleHub에서 보기</a></div>`;
+            modalBody.innerHTML = `<p style="color:red; text-align:center;">사전 데이터 없음</p><div style="text-align:center; margin-top:15px;"><a href="${link}" target="_blank" style="padding:8px; background:#eee; border-radius:5px;">BibleHub에서 보기</a></div>`;
         }
-        modalBody.innerHTML = html;
     } catch (err) { modalBody.innerHTML = "<p>통신 오류</p>"; }
 }
+
 function selectVerse(verseNum) {
     currentVerse = verseNum;
     document.querySelectorAll(".verse-item").forEach(el => el.classList.remove("selected"));
