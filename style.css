@@ -41,7 +41,7 @@ header {
     color: var(--header-text);
     padding: 1rem;
     flex-shrink: 0;
-    position: relative; /* 설정 버튼 배치를 위해 */
+    position: relative;
 }
 .header-content {
     display: flex;
@@ -53,15 +53,14 @@ header {
 h1 { margin: 0; font-size: 1.5rem; line-height: 1.2; }
 .sub-title { font-size: 0.9rem; color: #ccc; font-weight: normal; letter-spacing: 1px; }
 
-/* [NEW] 헤더 설정 버튼 */
+/* [NEW] 헤더 좌측 버튼 (비율) */
+.header-left {
+    position: absolute; left: 15px; top: 50%; transform: translateY(-50%);
+    display: flex; align-items: center;
+}
 .header-settings-btn {
-    position: absolute;
-    right: 15px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: #fff;
-    cursor: pointer;
-    background: none; border: none;
+    position: absolute; right: 15px; top: 50%; transform: translateY(-50%);
+    color: #fff; cursor: pointer; background: none; border: none;
 }
 .header-settings-btn:hover { color: var(--primary-color); }
 
@@ -80,6 +79,7 @@ h1 { margin: 0; font-size: 1.5rem; line-height: 1.2; }
 .nav-right-group { display: flex; align-items: center; gap: 10px; margin-left: auto; }
 .history-group, .book-group, .move-group { display: flex; align-items: center; gap: 5px; }
 
+/* 드롭다운 */
 .dropdown-wrapper { position: relative; display: inline-block; }
 .dropdown-menu {
     display: none; position: absolute; top: 100%; left: 0;
@@ -93,7 +93,6 @@ h1 { margin: 0; font-size: 1.5rem; line-height: 1.2; }
     text-align: center; border-bottom: 1px solid var(--hover-bg);
 }
 .menu-item:hover { background: var(--hover-bg); color: var(--primary-color); }
-.menu-item:last-child { border-bottom: none; }
 
 .icon-btn { background: none; border: none; cursor: pointer; font-size: 1.2rem; color: var(--text-sub); padding: 5px; }
 .icon-btn:hover { color: var(--primary-color); }
@@ -142,52 +141,73 @@ h1 { margin: 0; font-size: 1.5rem; line-height: 1.2; }
 }
 #analysis-panel.show, #lexicon-panel.show { transform: translateX(0); }
 
-/* 우측 주해창 */
+/* 우측 주해창 (PC 기본) */
 #commentary-area {
     width: 400px; background: var(--card-bg); border-left: 1px solid var(--border-color);
     display: flex; flex-direction: column; flex-shrink: 0; transition: transform 0.3s ease, width 0.3s ease, flex 0.3s ease; z-index: 900;
 }
 
-/* [NEW] 10:0 비율 포함 PC 레이아웃 */
-@media (min-width: 1025px) {
-    body.layout-40-60 #bible-area { flex: 4; }
-    body.layout-40-60 #commentary-area { width: 60%; }
+/* [수정] 레이아웃 비율 - 미디어 쿼리 제거하여 모바일도 적용 (단, Flex row 조건 필요) */
+/* 기본적으로 모바일은 flex-direction: column이 아니므로(html 구조상 row), % 너비가 먹힘. 
+   하지만 모바일에서는 보통 패널을 덮어씌우므로, 
+   화면 너비가 충분히 클 때만 분할 레이아웃을 적용하고, 작으면 무시하거나 패널 방식으로 처리.
+   사용자 요청: "폰과 패드에서도 되게 하라". 
+   패드(Tablet)는 분할이 의미가 있지만, 폰(좁은 화면)에서 5:5는 텍스트가 깨짐.
+   그러나 요청대로 전역으로 적용하되, 모바일 전용 스타일에서 덮어씀. 
+*/
 
-    body.layout-50-50 #bible-area { flex: 1; }
-    body.layout-50-50 #commentary-area { width: 50%; }
+/* 전역 레이아웃 비율 클래스 */
+body.layout-40-60 #bible-area { flex: 4; }
+body.layout-40-60 #commentary-area { width: 60%; display: flex; }
 
-    body.layout-60-40 #bible-area { flex: 6; }
-    body.layout-60-40 #commentary-area { width: 40%; }
+body.layout-50-50 #bible-area { flex: 1; }
+body.layout-50-50 #commentary-area { width: 50%; display: flex; }
 
-    body.layout-70-30 #bible-area { flex: 7; }
-    body.layout-70-30 #commentary-area { width: 30%; }
+body.layout-60-40 #bible-area { flex: 6; }
+body.layout-60-40 #commentary-area { width: 40%; display: flex; }
 
-    /* 10:0 - 우측 패널 숨김 */
-    body.layout-100-0 #bible-area { flex: 1; }
-    body.layout-100-0 #commentary-area { display: none; }
+body.layout-70-30 #bible-area { flex: 7; }
+body.layout-70-30 #commentary-area { width: 30%; display: flex; }
+
+/* [수정] 10:0 비율 - 주해창 숨김 */
+body.layout-100-0 #bible-area { flex: 1; }
+body.layout-100-0 #commentary-area { display: none; }
+
+/* 헤더 (고정) */
+.sticky-header {
+    position: sticky; top: 0; left: 0; right: 0; z-index: 10;
 }
-
 .panel-header {
     padding: 10px 15px; background: var(--hover-bg); border-bottom: 1px solid var(--border-color);
     font-weight: bold; color: var(--text-sub); display: flex; justify-content: space-between; align-items: center;
 }
 .scrollable-content { flex: 1; overflow-y: auto; padding: 15px; }
 
+/* 모바일 전용 스타일 (화면 너비 768px 이하) */
 .mobile-only { display: none; }
 @media (max-width: 768px) {
     .mobile-only { display: inline-block; }
+    
+    /* [수정] 모바일 주해창: 전체 화면 덮기 */
     #commentary-area {
-        position: absolute; top: 0; right: 0; bottom: 0; width: 85%; max-width: 400px;
-        box-shadow: -5px 0 15px rgba(0,0,0,0.3); transform: translateX(100%); background-color: var(--card-bg);
+        position: fixed; /* absolute -> fixed */
+        top: 0; right: 0; bottom: 0; 
+        width: 100%; /* 85% -> 100% */
+        max-width: none; /* max-width 해제 */
+        box-shadow: none; 
+        transform: translateX(100%); 
+        background-color: var(--card-bg);
+        z-index: 2000; /* 최상단 */
+        /* 레이아웃 비율 무시하고 덮어쓰기 */
+        display: flex !important; 
     }
     #commentary-area.show { transform: translateX(0); }
+    
     .korean-text { font-size: 1.1rem !important; }
     .hebrew-text { font-size: 1.3rem !important; }
     .nav-left-group { gap: 5px; }
     .location-text { font-size: 1rem; }
     #bible-area { padding-top: 40px; }
-    /* 모바일에서 10:0은 무시하고 덮어쓰기 방식 유지 */
-    body.layout-100-0 #commentary-area { display: flex; } 
 }
 
 .verse-item { padding: 15px; border-bottom: 1px solid var(--border-color); display: flex; gap: 12px; }
@@ -213,13 +233,12 @@ h1 { margin: 0; font-size: 1.5rem; line-height: 1.2; }
 
 .text-column { flex: 1; }
 .verse-line { margin-bottom: 6px; position: relative; display: flex; align-items: baseline; gap: 5px; flex-wrap: wrap; }
+.verse-line.hidden { display: none !important; }
+
 .korean-text { font-size: 1.25rem; color: var(--text-color); font-weight: 500; line-height: 1.5; }
 .english-text { display: block; font-size: 1rem; color: var(--text-sub); font-family: serif; margin-top: 2px; width: 100%; }
 .hebrew-text { display: block; font-size: 1.5rem; color: var(--text-color); font-family: serif; direction: rtl; margin-top: 8px; width: 100%; text-align: right;}
 .greek-text { display: block; font-size: 1.3rem; color: var(--text-color); font-family: serif; margin-top: 5px; width: 100%; }
-
-/* [NEW] 본문 숨김 클래스 */
-.verse-line.hidden { display: none !important; }
 
 .hebrew-word { cursor: pointer; }
 .hebrew-word:hover { color: blue; text-decoration: underline; }
@@ -236,8 +255,13 @@ textarea { width: 100%; height: 300px; padding: 10px; border: 1px solid var(--bo
 .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--modal-bg); display: flex; justify-content: center; align-items: center; z-index: 2000; }
 .modal-content { background: var(--card-bg); padding: 20px; border-radius: 8px; width: 90%; max-width: 600px; max-height: 80vh; overflow-y: auto; position: relative; color: var(--text-color); }
 .large-modal { max-width: 800px; }
-.medium-modal { max-width: 500px; } /* [NEW] 복사창용 중간 사이즈 */
+.medium-modal { max-width: 500px; }
 .small-modal { max-width: 350px; }
+
+/* [수정] 복사창 우측 정렬 */
+.right-aligned-modal {
+    margin-right: 20px; 
+}
 
 .close-btn { position: absolute; top: 10px; right: 15px; font-size: 24px; cursor: pointer; color: var(--text-sub); }
 .sticky-close { position: sticky; top: 0; float: right; background: var(--card-bg); border-radius: 50%; padding: 2px 8px; z-index: 100; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
@@ -256,24 +280,25 @@ mark { background-color: #ffeeba; color: #333; padding: 0 2px; border-radius: 2p
 .analysis-container { display: flex; flex-direction: column; gap: 8px; }
 .analysis-word-item { margin-bottom: 5px; line-height: 1.4; font-size: 1.05rem; }
 
-.orig-word { font-size: 1.6rem; font-family: serif; font-weight: bold; color: #00008B; }
+.orig-word { font-size: 1.6rem; font-family: serif; font-weight: bold; color: #00008B; cursor: pointer; } /* 원어에 커서 추가 */
 .meaning-text { color: #e83e8c; font-weight: bold; }
 .grammar-arrow { color: #999; font-size: 0.9rem; margin-right: 5px; }
 
 .lexicon-huge-word { font-size: 2rem; font-weight: bold; color: var(--primary-color); font-family: serif; margin-right: 5px; }
 
-/* [NEW] 복사 모달 스타일 개선 */
+/* [수정] 복사 옵션 스타일 */
+.range-labels { display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-sub); margin-bottom: 5px; }
+.range-labels .label-text { flex: 1; text-align: center; }
 .copy-row { display: flex; align-items: center; margin-bottom: 15px; justify-content: space-between; }
 .copy-btn-small { 
     flex: 1; padding: 10px; background: var(--bg-color); border: 1px solid var(--border-color); 
-    border-radius: 4px; cursor: pointer; font-size: 1rem; color: var(--text-color); margin-right: 10px;
-    text-align: center;
+    border-radius: 4px; cursor: pointer; font-size: 0.9rem; color: var(--text-color); margin-right: 10px;
+    text-align: center; white-space: nowrap;
 }
 .copy-btn-small:hover { background: var(--hover-bg); border-color: var(--primary-color); }
 .range-selector { display: flex; align-items: center; gap: 5px; flex: 1; }
 .verse-select { padding: 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color); width: 100%; }
 
-/* [NEW] 설정 모달 스타일 */
 .settings-options label { display: block; padding: 10px; border-bottom: 1px solid var(--border-color); cursor: pointer; }
 .settings-options input { margin-right: 10px; }
 
