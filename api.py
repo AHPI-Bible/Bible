@@ -22,6 +22,24 @@ search_index = { 'kor': [], 'eng': [], 'heb': [], 'grk': [] }
 
 base_dir = os.path.dirname(os.path.abspath(__file__))
 
+# [NEW] 책 이름 -> 숫자 ID 매핑 (DB 조회용)
+BOOK_TO_ID = {
+    "Genesis": 1, "Exodus": 2, "Leviticus": 3, "Numbers": 4, "Deuteronomy": 5,
+    "Joshua": 6, "Judges": 7, "Ruth": 8, "1 Samuel": 9, "2 Samuel": 10,
+    "1 Kings": 11, "2 Kings": 12, "1 Chronicles": 13, "2 Chronicles": 14,
+    "Ezra": 15, "Nehemiah": 16, "Esther": 17, "Job": 18, "Psalms": 19, "Proverbs": 20,
+    "Ecclesiastes": 21, "Song of Songs": 22, "Isaiah": 23, "Jeremiah": 24,
+    "Lamentations": 25, "Ezekiel": 26, "Daniel": 27, "Hosea": 28, "Joel": 29,
+    "Amos": 30, "Obadiah": 31, "Jonah": 32, "Micah": 33, "Nahum": 34,
+    "Habakkuk": 35, "Zephaniah": 36, "Haggai": 37, "Zechariah": 38, "Malachi": 39,
+    "Matthew": 40, "Mark": 41, "Luke": 42, "John": 43, "Acts": 44,
+    "Romans": 45, "1 Corinthians": 46, "2 Corinthians": 47, "Galatians": 48,
+    "Ephesians": 49, "Philippians": 50, "Colossians": 51, "1 Thessalonians": 52,
+    "2 Thessalonians": 53, "1 Timothy": 54, "2 Timothy": 55, "Titus": 56,
+    "Philemon": 57, "Hebrews": 58, "James": 59, "1 Peter": 60, "2 Peter": 61,
+    "1 John": 62, "2 John": 63, "3 John": 64, "Jude": 65, "Revelation": 66
+}
+
 def load_csv_to_map(filename, target_map, lang_code=None, is_lexicon=False):
     path = os.path.join(base_dir, filename)
     if not os.path.exists(path):
@@ -29,56 +47,46 @@ def load_csv_to_map(filename, target_map, lang_code=None, is_lexicon=False):
         return
     
     try:
-        # [강력해진 1절 로직] utf-8-sig로 BOM 처리 + 헤더 정밀 감지
+        # [수정] 1절 표시를 위해 헤더 무시하고 강제로 읽기
         with open(path, 'r', encoding='utf-8-sig') as f:
-            # 먼저 리스트 형태로 모든 줄을 읽어버림 (안전함)
-            rows = list(csv.reader(f))
+            reader = csv.reader(f)
             
-            if not rows:
-                return
+            count = 0
+            for row in reader:
+                if not row: continue
+                
+                # 사전(Lexicon) 처리
+                if is_lexicon:
+                    if len(row) >= 2:
+                        target_map[row[0]] = row[1]
+                        count += 1
+                    continue
 
-            # 첫 줄 분석
-            first_row = rows[0]
-            # 헤더인지 판별: 첫 줄에 'Book', 'Chapter' 같은 단어가 있고, 숫자가 없으면 헤더라고 판단
-            is_header = False
-            if len(first_row) >= 3:
-                # 만약 첫 줄의 2번째(장), 3번째(절) 컬럼이 숫자가 아니라면 제목줄일 확률 높음
-                if not first_row[1].isdigit() or not first_row[2].isdigit():
-                     # 단, 사전(Lexicon) 파일은 구조가 다르므로 예외
-                    if not is_lexicon:
-                        is_header = True
+                # 성경 본문 처리 (Book, Chapter, Verse, Text)
+                if len(row) < 4: continue
+                
+                b, c, v, t = row[0], row[1], row[2], row[3]
 
-            start_idx = 1 if is_header else 0 # 헤더면 1번부터, 아니면 0번(1절)부터 시작
-            
-            # 사전 파일용 별도 처리
-            if is_lexicon:
-                for i in range(start_idx, len(rows)):
-                    row = rows[i]
-                    if len(row) < 2: continue
-                    target_map[row[0]] = row[1]
-            else:
-                # 성경 파일 처리
-                for i in range(start_idx, len(rows)):
-                    row = rows[i]
-                    if len(row) < 4: continue # 최소 4개 컬럼 (책,장,절,본문)
-                    
-                    b, c, v, t = row[0], row[1], row[2], row[3]
-                    
-                    # 데이터 유효성 검사
-                    if not b or not c or not v: continue
-                    
-                    try:
-                        key = f"{b}-{int(c)}-{int(v)}"
-                        target_map[key] = t
-                        
-                        if lang_code:
-                            search_index[lang_code].append({
-                                "book": b, "chapter": int(c), "verse": int(v), "text": t
-                            })
-                    except ValueError:
-                        continue # 숫자가 아닌 값이 들어있으면 패스
+                # 첫 줄이 제목(Header)인 경우 건너뛰기 로직
+                # (숫자가 아니면 제목으로 간주하되, Genesis 같은 책 이름이면 데이터로 간주)
+                if not c.isdigit() or not v.isdigit():
+                    # 만약 첫 컬럼이 책 이름 목록에 있다면 이건 데이터다! (1절 복구 핵심)
+                    if b not in BOOK_TO_ID: 
+                        continue 
 
-        print(f"✅ {filename} 로드 완료: {len(target_map)}건 (1절 강제 로드 적용됨)")
+                try:
+                    key = f"{b}-{int(c)}-{int(v)}"
+                    target_map[key] = t
+                    count += 1
+                    
+                    if lang_code:
+                        search_index[lang_code].append({
+                            "book": b, "chapter": int(c), "verse": int(v), "text": t
+                        })
+                except ValueError:
+                    continue
+
+        print(f"✅ {filename} 로드 완료: {count}건")
         
     except Exception as e:
         print(f"❌ {filename} 로드 실패: {e}")
@@ -95,7 +103,6 @@ def get_db_connection():
     if 'DATABASE_URL' in os.environ:
         conn = psycopg2.connect(os.environ['DATABASE_URL'])
         return conn
-    # 로컬 테스트용은 예외처리
     return None
 
 def init_db():
@@ -123,7 +130,7 @@ def init_db():
 with app.app_context():
     init_db()
 
-# [수정됨] 원전분해: 'Bible' 테이블 자동 분석
+# [수정] 원전분해: 책 이름을 숫자로 변환하여 조회
 def get_analysis_from_sdb(book, chapter, verse):
     sdb_path = os.path.join(base_dir, '원전분해.sdb')
     
@@ -132,33 +139,36 @@ def get_analysis_from_sdb(book, chapter, verse):
 
     try:
         conn = sqlite3.connect(sdb_path)
-        conn.row_factory = sqlite3.Row # 컬럼명으로 접근 가능
+        conn.row_factory = sqlite3.Row
         cur = conn.cursor()
 
         # 1. 테이블 확인
         cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
         tables = [row['name'] for row in cur.fetchall()]
         
-        target_table = 'Bible' # 사용자 이미지에서 확인된 테이블명
+        target_table = 'Bible'
         if target_table not in tables:
             conn.close()
-            return {"error": f"DB 오류: '{target_table}' 테이블이 없습니다. 발견된 목록: {tables}"}
+            return {"error": f"DB 오류: '{target_table}' 테이블이 없습니다. 목록: {tables}"}
 
-        # 2. 모든 컬럼 가져오기 (컬럼명을 모르므로 *)
-        # 주의: book 이름이 파일마다 다를 수 있음 (영어/한글/숫자). 
-        # 일단 파라미터로 넘어온 book(영어)을 시도해보고, 안되면 매핑이 필요할 수 있음.
+        # 2. 책 이름(String) -> ID(Integer) 변환
+        # DB에는 Genesis 대신 1, Exodus 대신 2가 들어있을 확률이 99%입니다.
+        book_id = BOOK_TO_ID.get(book)
         
-        query = f"SELECT * FROM {target_table} WHERE book = ? AND chapter = ? AND verse = ?"
-        
-        # 만약 SDB 파일이 책 이름을 숫자로 관리한다면 여기서 변환 로직이 필요함.
-        # 일단은 문자열 그대로 시도.
-        cur.execute(query, (book, chapter, verse))
+        if not book_id:
+            # 매핑 실패 시 원본 문자열로라도 시도
+            query = f"SELECT * FROM {target_table} WHERE book = ? AND chapter = ? AND verse = ?"
+            cur.execute(query, (book, chapter, verse))
+        else:
+            # ID로 조회 (book 컬럼이 숫자라고 가정)
+            query = f"SELECT * FROM {target_table} WHERE book = ? AND chapter = ? AND verse = ?"
+            cur.execute(query, (book_id, chapter, verse))
+            
         rows = cur.fetchall()
         
-        # 3. 결과 딕셔너리 변환 (컬럼명을 동적으로 가져옴)
+        # 3. 결과 변환
         result = []
         for row in rows:
-            # sqlite3.Row 객체를 딕셔너리로 변환
             row_dict = dict(row)
             result.append(row_dict)
             
@@ -214,7 +224,6 @@ def get_lexicon(code):
 
 @app.route('/api/analysis/<book>/<int:chapter>/<int:verse>', methods=['GET'])
 def get_verse_analysis(book, chapter, verse):
-    # sdb 조회
     data = get_analysis_from_sdb(book, chapter, verse)
     return jsonify(data)
 
@@ -254,7 +263,6 @@ def search_bible():
     
     for item in target_data:
         if query in item['text']:
-            # 검색 결과 미리보기 텍스트 생성 (앞뒤 자르기 등은 프론트에서 해도 됨)
             results.append(item)
             count += 1
             if count >= 100: break
