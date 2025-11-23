@@ -242,121 +242,119 @@ function renderBibleList() {
     makeHebrewWordsClickable();
 }
 
+// --- [수정됨] 단어 클릭 기능 및 사전 연동 (알파알렙 스타일) ---
+
+// 1. 히브리어/헬라어 단어에 클릭 이벤트 심기
 function makeHebrewWordsClickable() {
+    const hebrewElement = document.querySelector(".hebrew-text");
+    if (!hebrewElement) return;
+    
+    // 텍스트를 공백으로 분리
+    const words = hebrewElement.textContent.split(/\s+/).filter(w => w.length > 0);
+    let htmlContent = '';
+    
+    words.forEach(word => {
+        // 히브리어(0590-05FF) 또는 헬라어(0370-1FFF) 범위 체크
+        if (/[\u0590-\u05FF]/.test(word) || /[\u0370-\u03FF\u1F00-\u1FFF]/.test(word)) {
+            // 따옴표 등 특수문자 제거 후 데이터에 담기
+            const cleanData = word.replace(/['".,;:]/g, '');
+            htmlContent += `<span class="hebrew-word" data-word="${cleanData}">${word}</span> `;
+        } else {
+            htmlContent += `${word} `;
+        }
+    });
+    
+    hebrewElement.innerHTML = htmlContent;
+    
+    // 이벤트 리스너 연결
     document.querySelectorAll('.hebrew-word').forEach(span => {
         span.addEventListener('click', handleWordClick);
     });
 }
 
+// 2. [핵심] 단어 클릭 시 팝업 처리
 async function handleWordClick(event) {
     const rawWord = event.target.dataset.word;
     const modal = document.getElementById("lexicon-modal");
     const modalBody = document.getElementById("modal-body");
+    
+    // 팝업 열기
     modal.style.display = "flex"; 
-    modalBody.innerHTML = `<p style="color:#666;">'${rawWord}' 검색 중...</p>`;
+    modalBody.innerHTML = `<p style="color:#666; font-size:1.2rem;">🔍 '${rawWord}' 분석 중...</p>`;
 
+    // 언어 감지
     const isHebrew = /[\u0590-\u05FF]/.test(rawWord);
+
+    // 1. 검색용 단어 손질 (장식 기호 제거)
+    let cleanWord = rawWord;
+    if (isHebrew) {
+        // 히브리어: 트로프/엑센트(0591-05C7) 제거 -> 순수 자음+모음만 남김
+        cleanWord = rawWord.replace(/[\u0591-\u05C7]/g, ''); 
+    } else {
+        // 헬라어: 문장부호 제거
+        cleanWord = rawWord.replace(/[.,;·]/g, '');
+    }
+
+    // 2. 팝업 내용 구성
+    let html = `<h3 style="font-size:2rem; color:#007bff; margin-bottom:15px; text-align:center;">${rawWord}</h3>`;
+    
+    // [사전 링크] 네이버 사전 & BibleHub (알파알렙 스타일)
+    html += `<div style="display:flex; gap:10px; justify-content:center; margin-bottom:20px;">`;
+    
+    if (isHebrew) {
+        html += `<a href="https://dict.naver.com/heko/#/search?query=${cleanWord}" target="_blank" 
+                    style="padding:8px 15px; background:#03C75A; color:white; border-radius:5px; text-decoration:none; font-weight:bold;">
+                    네이버 히브리어 사전
+                 </a>`;
+        html += `<a href="https://biblehub.com/hebrew/${cleanWord}.htm" target="_blank" 
+                    style="padding:8px 15px; background:#004085; color:white; border-radius:5px; text-decoration:none; font-weight:bold;">
+                    Bible Hub
+                 </a>`;
+    } else {
+        html += `<a href="https://dict.naver.com/grko/#/search?query=${cleanWord}" target="_blank" 
+                    style="padding:8px 15px; background:#03C75A; color:white; border-radius:5px; text-decoration:none; font-weight:bold;">
+                    네이버 헬라어 사전
+                 </a>`;
+        html += `<a href="https://biblehub.com/greek/${cleanWord}.htm" target="_blank" 
+                    style="padding:8px 15px; background:#004085; color:white; border-radius:5px; text-decoration:none; font-weight:bold;">
+                    Bible Hub
+                 </a>`;
+    }
+    html += `</div>`;
+
+    // [API 검색] Sefaria 사전 (히브리어만 지원)
     if (isHebrew) {
         try {
-            const strippedWord = rawWord.replace(/[\u0591-\u05C7]/g, '');
-            const res = await fetch(`https://www.sefaria.org/api/words/${strippedWord}`);
-            const data = await res.json();
-            if (Array.isArray(data) && data.length > 0) {
-                const entry = data[0]; 
-                let html = `<h3 dir="rtl" style="font-size:1.8rem; color:#007bff;">${entry.hebrew || strippedWord}</h3>`;
-                html += `<p><strong>기본형(Root):</strong> ${entry.headword || "-"}</p>`;
-                if (entry.senses) html += "<ul style='text-align:left;'>" + entry.senses.map(s => s.definition ? `<li>${s.definition}</li>` : "").join("") + "</ul>";
-                else html += "<p>상세 정의 없음</p>";
-                modalBody.innerHTML = html;
-            } else {
-                modalBody.innerHTML = `<h3 dir="rtl">${rawWord}</h3><p>결과 없음</p><a href="https://biblehub.com/hebrew/${strippedWord}.htm" target="_blank" style="color:blue;">BibleHub 검색 ↗</a>`;
+            // Sefaria API 호출
+            const res = await fetch(`https://www.sefaria.org/api/words/${cleanWord}`);
+            if (res.ok) {
+                const data = await res.json();
+                
+                if (Array.isArray(data) && data.length > 0) {
+                    html += `<div style="text-align:left; background:#f8f9fa; padding:15px; border-radius:8px;">`;
+                    html += `<h4 style="margin-top:0;">Sefaria 사전 결과:</h4>`;
+                    
+                    data.forEach((entry, index) => {
+                        if (index > 2) return; // 최대 3개까지만 표시
+                        html += `<p><strong>${entry.headword || ''}</strong>: `;
+                        if (entry.senses) {
+                            entry.senses.forEach(s => {
+                                if (s.definition) html += `<span>${s.definition}; </span>`;
+                            });
+                        }
+                        html += `</p>`;
+                    });
+                    html += `</div>`;
+                } else {
+                    html += `<p style="color:#888; text-align:center;">(Sefaria 사전 데이터 없음)</p>`;
+                }
             }
-        } catch (e) { modalBody.innerHTML = "<p>오류 발생</p>"; }
+        } catch (e) {
+            console.log("사전 API 오류");
+        }
     } else {
-        const cleanGreek = rawWord.replace(/[.,;·]/g, '');
-        modalBody.innerHTML = `<h3 style="font-size:1.5rem;">${rawWord}</h3><div style="display:flex; flex-direction:column; gap:10px; margin-top:15px;"><a href="https://biblehub.com/greek/${cleanGreek}.htm" target="_blank" style="padding:10px; background:#eee;">📘 BibleHub 사전</a></div>`;
+        html += `<p style="color:#888; text-align:center;">(헬라어는 위 버튼을 이용해 전문 사전을 참고하세요)</p>`;
     }
-}
 
-function selectVerse(verseNum) {
-    currentVerse = verseNum;
-    document.querySelectorAll(".verse-item").forEach(el => el.classList.remove("selected"));
-    const targetRow = document.getElementById(`verse-row-${verseNum}`);
-    if (targetRow) {
-        targetRow.classList.add("selected");
-        targetRow.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
-    document.getElementById("current-verse-display").innerText = `${KOREAN_BOOK_NAMES[currentBook] || currentBook} ${currentChapter}:${verseNum}`;
-    const comment = loadedChapterData.commentaries[verseNum];
-    document.getElementById("commentary-display").innerText = comment ? comment : "작성된 주해가 없습니다.";
-    closeEditor();
+    modalBody.innerHTML = html;
 }
-
-function openEditor() {
-    const displayDiv = document.getElementById("commentary-display");
-    const input = document.getElementById("commentary-input");
-    input.value = displayDiv.innerText === "작성된 주해가 없습니다." ? "" : displayDiv.innerText;
-    document.getElementById("commentary-display").style.display = "none";
-    document.getElementById("edit-btn").style.display = "none";
-    document.getElementById("editor-container").style.display = "block";
-}
-function closeEditor() {
-    document.getElementById("editor-container").style.display = "none";
-    document.getElementById("commentary-display").style.display = "block";
-    document.getElementById("edit-btn").style.display = "block";
-}
-async function saveCommentary() {
-    const content = document.getElementById("commentary-input").value;
-    const btn = document.getElementById("save-btn");
-    btn.innerText = "저장 중...";
-    try {
-        const res = await fetch(`${AHPI_API_BASE_URL}/save_commentary`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ book: currentBook, chapter: currentChapter, verse: currentVerse, content: content })
-        });
-        if (res.ok) {
-            alert("저장되었습니다.");
-            loadedChapterData.commentaries[currentVerse] = content;
-            selectVerse(currentVerse); 
-        } else alert("저장 실패");
-    } catch(e) { alert("오류"); }
-    finally { btn.innerText = "저장"; }
-}
-function goToNextChapter() {
-    if(currentChapter < BIBLE_DATA[currentBook]) fetchChapter(currentBook, currentChapter + 1);
-    else {
-        const idx = BOOK_NAMES.indexOf(currentBook);
-        if(idx < BOOK_NAMES.length-1) fetchChapter(BOOK_NAMES[idx+1], 1);
-    }
-}
-function goToPrevChapter() {
-    if(currentChapter > 1) fetchChapter(currentBook, currentChapter - 1);
-    else {
-        const idx = BOOK_NAMES.indexOf(currentBook);
-        if(idx > 0) fetchChapter(BOOK_NAMES[idx-1], BIBLE_DATA[BOOK_NAMES[idx-1]]);
-    }
-}
-async function performSearch() {
-    const q = document.getElementById("search-input").value;
-    if(q.length<2) return alert("2글자 이상");
-    const modal = document.getElementById("search-result-modal");
-    const body = document.getElementById("search-results-body");
-    body.innerHTML = "검색 중...";
-    modal.style.display = "flex";
-    const res = await fetch(`${AHPI_API_BASE_URL}/search?q=${encodeURIComponent(q)}`);
-    const data = await res.json();
-    if(data.results?.length) {
-        body.innerHTML = data.results.map(item => 
-            `<div class="search-item" onclick="goToSearchResult('${item.book}', ${item.chapter}, ${item.verse})">
-                <div class="search-ref">${KOREAN_BOOK_NAMES[item.book] || item.book} ${item.chapter}:${item.verse}</div>
-                <div class="search-text">${item.text}</div>
-            </div>`
-        ).join("");
-    } else body.innerHTML = "결과 없음";
-}
-window.goToSearchResult = function(b, c, v) {
-    document.getElementById("search-result-modal").style.display = "none";
-    currentVerse = v; 
-    fetchChapter(b, c);
-};
