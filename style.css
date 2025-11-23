@@ -58,34 +58,51 @@ textarea { width: 100%; height: 200px; padding: 10px; border: 1px solid #ddd; bo
 .save-btn { background: #28a745; }
 .cancel-btn { background: #dc3545; }
 
-/* --- 팝업 (모달) 스타일 --- */
+/* --- 팝업 (모달) 공통 스타일 --- */
 .modal-overlay {
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000;
+    position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%;
+    background-color: rgba(0, 0, 0, 0.5); justify-content: center; align-items: center;
 }
 .modal-content {
-    background: #fff; padding: 20px; border-radius: 8px; width: 90%; max-width: 600px; max-height: 80vh; overflow-y: auto; position: relative;
+    background: #fff; padding: 20px; border-radius: 8px; width: 90%; max-width: 600px;
+    position: relative; max-height: 80vh; overflow-y: auto;
 }
 .large-modal { max-width: 800px; }
-.close-btn { position: absolute; top: 10px; right: 15px; font-size: 24px; cursor: pointer; color: #aaa; }
+
+/* [NEW] 장 선택 팝업만 크기 줄이기 (3분의 2 수준) */
+#chapter-nav-modal .modal-content {
+    max-width: 350px; /* 너비 축소 */
+}
+
+/* 닫기 버튼 */
+.close-btn { position: absolute; top: 10px; right: 15px; font-size: 24px; cursor: pointer; color: #888; }
 .close-btn:hover { color: #000; }
 
-/* [NEW] 그리드 레이아웃 (책 목록 / 장 숫자판) */
+/* 그리드 */
 .grid-container {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); /* 반응형 타일 */
-    gap: 10px;
-    margin-top: 15px;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; margin-top: 15px;
 }
+/* [NEW] 숫자판 그리드: 숫자는 작으니까 칸을 좁게 */
+#chapter-grid {
+    grid-template-columns: repeat(auto-fill, minmax(50px, 1fr)); 
+}
+
 .grid-btn {
-    padding: 12px 5px;
-    background: #f8f9fa;
-    border: 1px solid #ddd;
-    border-radius: 5px;
-    text-align: center;
-    cursor: pointer;
-    font-size: 1rem;
+    padding: 12px 5px; background: #f8f9fa; border: 1px solid #ddd; border-radius: 5px;
+    text-align: center; cursor: pointer; font-size: 1rem;
 }
 .grid-btn:hover { background: #e2e6ea; border-color: #adb5bd; }
 .grid-btn.selected { background: #007bff; color: white; border-color: #007bff; }
-.grid-btn.chapter-num { font-weight: bold; font-size: 1.2rem; }
+
+/* 스트롱 코드 연결된 단어 스타일 */
+.strong-word {
+    cursor: pointer;
+    color: #0056b3; /* 진한 파랑 */
+    text-decoration: underline;
+    text-decoration-style: dotted; /* 점선 밑줄 */
+    text-underline-offset: 3px;
+}
+.strong-word:hover {
+    background-color: #e2e6ea;
+    color: #003d82;
+}

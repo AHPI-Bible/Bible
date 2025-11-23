@@ -8,59 +8,65 @@ app = Flask(__name__)
 CORS(app)
 
 # ---------------------------------------------------
-# 1. 성경 데이터 로드 (4개 언어 모두 로드)
+# 1. 데이터 로드 (성경 + 사전)
 # ---------------------------------------------------
-print("--- 서버 시작: 성경 데이터 로드 중 ---")
+print("--- 서버 시작: 데이터 로드 중 ---")
 
-# 데이터 저장소
 korean_map = {}          
 english_map = {}         
 greek_map = {}           
 hebrew_map = {}          
 bible_data_list = []     # 검색용
+lexicon_map = {}         # [NEW] 사전 데이터 (메모리 캐시용)
 
 base_dir = os.path.dirname(os.path.abspath(__file__))
 
-# CSV 파일 읽기 함수
-def load_csv_to_map(filename, target_map, is_korean=False):
+def load_csv_to_map(filename, target_map, is_korean=False, is_lexicon=False):
     path = os.path.join(base_dir, filename)
     if not os.path.exists(path):
         print(f"⚠️ 파일 없음: {filename}")
         return
     
     try:
-        with open(path, 'r', encoding='utf-8') as f:
+        # [수정] utf-8-sig를 사용하여 1절 깨짐 방지
+        with open(path, 'r', encoding='utf-8-sig') as f:
             reader = csv.DictReader(f)
             count = 0
             for row in reader:
-                # 컬럼 이름 호환성 처리
-                b = row.get('book_name') or row.get('book')
-                c = row.get('chapter_num') or row.get('chapter')
-                v = row.get('verse_num') or row.get('verse')
-                t = row.get('korean_text') or row.get('text')
-                
-                if not b: continue
+                if is_lexicon:
+                    # 사전 데이터 로드 (strong_code, content)
+                    code = row.get('strong_code')
+                    content = row.get('content')
+                    if code and content:
+                        target_map[code] = content
+                        count += 1
+                else:
+                    # 성경 데이터 로드
+                    b = row.get('book_name') or row.get('book')
+                    c = row.get('chapter_num') or row.get('chapter')
+                    v = row.get('verse_num') or row.get('verse')
+                    t = row.get('korean_text') or row.get('text')
+                    
+                    if not b: continue
 
-                # 키 생성: Genesis-1-1
-                key = f"{b}-{int(c)}-{int(v)}"
-                target_map[key] = t
-                count += 1
-                
-                # 한글은 검색용 리스트에도 추가
-                if is_korean:
-                    bible_data_list.append({
-                        "book": b, "chapter": int(c), "verse": int(v), "text": t
-                    })
-        print(f"✅ {filename} 로드 완료: {count}절")
+                    key = f"{b}-{int(c)}-{int(v)}"
+                    target_map[key] = t
+                    count += 1
+                    
+                    if is_korean:
+                        bible_data_list.append({
+                            "book": b, "chapter": int(c), "verse": int(v), "text": t
+                        })
+        print(f"✅ {filename} 로드 완료: {count}건")
     except Exception as e:
         print(f"❌ {filename} 로드 실패: {e}")
 
-# 4개 파일 로드 실행
+# 파일 로드 실행
 load_csv_to_map('korean_bible.csv', korean_map, is_korean=True)
 load_csv_to_map('english_bible.csv', english_map)
 load_csv_to_map('greek_bible.csv', greek_map)
 load_csv_to_map('hebrew_bible.csv', hebrew_map)
-
+load_csv_to_map('strong_lexicon.csv', lexicon_map, is_lexicon=True) # [NEW] 사전 로드
 
 # ---------------------------------------------------
 # 2. DB 연결
@@ -73,6 +79,7 @@ def init_db():
     try:
         conn = get_db_connection()
         cur = conn.cursor()
+        # 주석 테이블
         cur.execute("""
             CREATE TABLE IF NOT EXISTS commentaries (
                 id SERIAL PRIMARY KEY,
@@ -81,6 +88,13 @@ def init_db():
                 verse INT NOT NULL,
                 content TEXT,
                 UNIQUE(book, chapter, verse)
+            );
+        """)
+        # [NEW] 사전 테이블 (옵션: 메모리에 없으면 DB 사용)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS lexicon (
+                code VARCHAR(20) PRIMARY KEY,
+                content TEXT
             );
         """)
         conn.commit()
@@ -97,26 +111,20 @@ with app.app_context():
 # 3. API 라우트
 # ---------------------------------------------------
 
-# [핵심] 챕터 데이터 통째로 주기
 @app.route('/api/get_chapter_data/<book_name>/<int:chapter_num>', methods=['GET'])
 def get_ahpi_chapter_data(book_name, chapter_num):
-    print(f"요청: {book_name} {chapter_num}장")
-    
     korean_verses = {}
     english_verses = {}
     greek_verses = {}
     hebrew_verses = {}
     
-    # 1절부터 176절까지 돌면서 데이터가 있으면 담음
     for i in range(1, 177):
         key = f"{book_name}-{chapter_num}-{i}"
-        
         if key in korean_map: korean_verses[i] = korean_map[key]
         if key in english_map: english_verses[i] = english_map[key]
         if key in greek_map: greek_verses[i] = greek_map[key]
         if key in hebrew_map: hebrew_verses[i] = hebrew_map[key]
 
-    # 주해 가져오기
     commentaries = {}
     try:
         conn = get_db_connection()
@@ -140,6 +148,16 @@ def get_ahpi_chapter_data(book_name, chapter_num):
         'hebrew_verses': hebrew_verses,
         'commentaries': commentaries
     })
+
+# [NEW] 사전 데이터 요청
+@app.route('/api/lexicon/<code>', methods=['GET'])
+def get_lexicon(code):
+    # 1. 메모리에서 먼저 찾음
+    if code in lexicon_map:
+        return jsonify({"code": code, "content": lexicon_map[code]})
+    
+    # 2. 없으면 DB에서 찾음 (확장성)
+    return jsonify({"code": code, "content": "사전 데이터가 없습니다."})
 
 @app.route('/api/save_commentary', methods=['POST'])
 def save_commentary():
