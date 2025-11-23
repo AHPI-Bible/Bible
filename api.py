@@ -9,27 +9,35 @@ CORS(app)
 
 print("--- 서버 시작: 데이터 로드 중 ---")
 
+# 데이터 저장소
 korean_map = {}          
 english_map = {}         
 greek_map = {}           
 hebrew_map = {}          
-bible_data_list = []     
 lexicon_map = {}         
+
+# 검색용 인덱스 (언어별 분리)
+search_index = {
+    'kor': [],
+    'eng': [],
+    'heb': [],
+    'grk': []
+}
 
 base_dir = os.path.dirname(os.path.abspath(__file__))
 
-def load_csv_to_map(filename, target_map, is_korean=False, is_lexicon=False):
+def load_csv_to_map(filename, target_map, lang_code=None, is_lexicon=False):
     path = os.path.join(base_dir, filename)
     if not os.path.exists(path):
         print(f"⚠️ 파일 없음: {filename}")
         return
     
     try:
-        # [핵심 수정] utf-8-sig : 1절이 안 보이는 문제(BOM) 해결
+        # [핵심 수정] utf-8-sig를 사용하여 1절 깨짐(BOM) 방지
         with open(path, 'r', encoding='utf-8-sig') as f:
             reader = csv.DictReader(f)
             
-            # 헤더 공백 제거 (안전장치)
+            # 헤더 공백 제거
             if reader.fieldnames:
                 reader.fieldnames = [name.strip() for name in reader.fieldnames]
 
@@ -53,20 +61,24 @@ def load_csv_to_map(filename, target_map, is_korean=False, is_lexicon=False):
                     target_map[key] = t
                     count += 1
                     
-                    if is_korean:
-                        bible_data_list.append({
+                    # 검색 인덱스에 추가 (언어 코드가 있는 경우)
+                    if lang_code:
+                        search_index[lang_code].append({
                             "book": b, "chapter": int(c), "verse": int(v), "text": t
                         })
+                        
         print(f"✅ {filename} 로드 완료: {count}건")
     except Exception as e:
         print(f"❌ {filename} 로드 실패: {e}")
 
-load_csv_to_map('korean_bible.csv', korean_map, is_korean=True)
-load_csv_to_map('english_bible.csv', english_map)
-load_csv_to_map('greek_bible.csv', greek_map)
-load_csv_to_map('hebrew_bible.csv', hebrew_map)
+# 파일 로드 및 검색 인덱스 구축
+load_csv_to_map('korean_bible.csv', korean_map, lang_code='kor')
+load_csv_to_map('english_bible.csv', english_map, lang_code='eng')
+load_csv_to_map('greek_bible.csv', greek_map, lang_code='grk')
+load_csv_to_map('hebrew_bible.csv', hebrew_map, lang_code='heb')
 load_csv_to_map('strong_lexicon.csv', lexicon_map, is_lexicon=True)
 
+# DB 연결
 def get_db_connection():
     conn = psycopg2.connect(os.environ['DATABASE_URL'])
     return conn
@@ -94,6 +106,8 @@ def init_db():
 
 with app.app_context():
     init_db()
+
+# --- API 라우트 ---
 
 @app.route('/api/get_chapter_data/<book_name>/<int:chapter_num>', methods=['GET'])
 def get_ahpi_chapter_data(book_name, chapter_num):
@@ -158,18 +172,27 @@ def save_commentary():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# [수정됨] 다국어 검색 API
 @app.route('/api/search', methods=['GET'])
 def search_bible():
     query = request.args.get('q', '')
+    lang = request.args.get('lang', 'kor') # 언어 파라미터 받기 (기본값 kor)
+    
     if not query or len(query) < 2:
         return jsonify({"results": [], "message": "2글자 이상 입력"})
+    
     results = []
     count = 0
-    for item in bible_data_list:
+    
+    # 선택된 언어 데이터에서 검색
+    target_data = search_index.get(lang, [])
+    
+    for item in target_data:
         if query in item['text']:
             results.append(item)
             count += 1
             if count >= 100: break
+            
     return jsonify({"results": results, "count": count})
 
 if __name__ == '__main__':

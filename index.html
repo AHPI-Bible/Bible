@@ -16,15 +16,34 @@
     </header>
 
     <div class="nav-container">
-        <div class="nav-left">
-            <button id="prev-btn" class="nav-btn">◀</button>
-            <button id="btn-ot" class="nav-trigger">구약</button>
-            <button id="btn-nt" class="nav-trigger">신약</button>
-            <span id="current-location" class="location-text">창세기 1장</span>
-            <button id="next-btn" class="nav-btn">▶</button>
+        <!-- [수정] 좌측 그룹: 히스토리, 구약/신약, 이동 버튼 -->
+        <div class="nav-left-group">
+            <!-- 히스토리 버튼 -->
+            <div class="history-group">
+                <button id="hist-back-btn" class="nav-btn" title="이전 기록">◀ 이전</button>
+                <button id="hist-fwd-btn" class="nav-btn" title="다음 기록">다음 ▶</button>
+            </div>
+
+            <div class="book-group">
+                <button id="btn-ot" class="nav-trigger">구약</button>
+                <button id="btn-nt" class="nav-trigger">신약</button>
+            </div>
+            
+            <div class="move-group">
+                <button id="prev-btn" class="nav-btn">◀ 이전 장</button>
+                <span id="current-location" class="location-text">창세기 1장</span>
+                <button id="next-btn" class="nav-btn">다음 장 ▶</button>
+            </div>
         </div>
 
+        <!-- [수정] 우측 그룹: 검색 (언어 선택 포함) -->
         <div class="search-box">
+            <select id="search-lang">
+                <option value="kor" selected>한</option>
+                <option value="eng">영</option>
+                <option value="heb">히</option>
+                <option value="grk">헬</option>
+            </select>
             <input type="text" id="search-input" placeholder="단어 검색...">
             <button id="search-btn" class="nav-btn">🔍</button>
         </div>
