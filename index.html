@@ -14,20 +14,13 @@
             <h1>고대히브리관점 성경해석</h1>
             <span class="sub-title">AHP Bible Project</span>
         </div>
+        <button id="btn-settings" class="icon-btn header-settings-btn" title="설정">
+            <span class="material-icons">settings</span>
+        </button>
     </header>
 
     <div class="nav-container">
         <div class="nav-left-group">
-            <div class="dropdown-wrapper">
-                <button id="btn-layout-toggle" class="nav-btn" style="background:#555; margin-right:5px;" title="좌우 비율 변경">좌우비율 ▼</button>
-                <div id="layout-menu" class="dropdown-menu">
-                    <div class="menu-item" data-ratio="40-60">4:6</div>
-                    <div class="menu-item" data-ratio="50-50">5:5</div>
-                    <div class="menu-item" data-ratio="60-40">6:4</div>
-                    <div class="menu-item" data-ratio="70-30">7:3</div>
-                </div>
-            </div>
-
             <div class="history-group">
                 <button id="hist-back-btn" class="nav-btn" title="이전 기록">◀</button>
                 <button id="hist-fwd-btn" class="nav-btn" title="다음 기록">▶</button>
@@ -45,6 +38,17 @@
         </div>
 
         <div class="nav-right-group">
+            <div class="dropdown-wrapper">
+                <button id="btn-layout-toggle" class="nav-btn" style="background:#555; margin-right:5px;" title="좌우 비율 변경">좌우비율 ▼</button>
+                <div id="layout-menu" class="dropdown-menu">
+                    <div class="menu-item" data-ratio="40-60">4:6</div>
+                    <div class="menu-item" data-ratio="50-50">5:5</div>
+                    <div class="menu-item" data-ratio="60-40">6:4</div>
+                    <div class="menu-item" data-ratio="70-30">7:3</div>
+                    <div class="menu-item" data-ratio="100-0">10:0</div>
+                </div>
+            </div>
+
             <button id="btn-dark-mode" class="icon-btn" title="다크 모드">🌗</button>
 
             <div class="search-box">
@@ -86,13 +90,14 @@
         </section>
 
         <aside id="commentary-area">
-            <div class="panel-header">
+            <div class="panel-header" style="justify-content: space-between;">
+                <div style="width: 24px;"></div>
                 <div style="display:flex; align-items:center; gap:10px;">
-                    <span>AHP주해 (<span id="current-verse-display">1절</span>)</span>
+                    <span>AHPI주해 (<span id="current-verse-display">1절</span>)</span>
                     <button id="btn-comm-font-plus" class="icon-btn-small" title="주해 확대">A+</button>
                     <button id="btn-comm-font-minus" class="icon-btn-small" title="주해 축소">A-</button>
                 </div>
-                <span id="close-commentary-btn" class="material-icons close-icon mobile-only" style="cursor:pointer;">close</span>
+                <span id="close-commentary-btn" class="material-icons close-icon" style="cursor:pointer;">close</span>
             </div>
             <div id="commentary-content-wrapper" class="scrollable-content">
                 <div id="commentary-display">절을 선택하면 주해가 표시됩니다.</div>
@@ -109,13 +114,46 @@
     </main>
 
     <div id="copy-modal" class="modal-overlay" style="display: none;">
-        <div class="modal-content small-modal">
+        <div class="modal-content medium-modal">
             <span id="copy-close" class="close-btn">&times;</span>
-            <h2>복사할 내용 선택</h2>
+            <h2>복사</h2>
             <div class="copy-options">
-                <button class="copy-btn" id="copy-kor">한글 본문 복사</button>
-                <button class="copy-btn" id="copy-eng">영어 본문 복사</button>
-                <button class="copy-btn" id="copy-ori">원어 본문 복사</button>
+                <div class="copy-row">
+                    <button class="copy-btn-small" id="copy-kor">한글 본문</button>
+                    <div class="range-selector">
+                        <select id="kor-start" class="verse-select"></select>
+                        <span>~</span>
+                        <select id="kor-end" class="verse-select"></select>
+                    </div>
+                </div>
+                <div class="copy-row">
+                    <button class="copy-btn-small" id="copy-eng">영어 본문</button>
+                    <div class="range-selector">
+                        <select id="eng-start" class="verse-select"></select>
+                        <span>~</span>
+                        <select id="eng-end" class="verse-select"></select>
+                    </div>
+                </div>
+                <div class="copy-row">
+                    <button class="copy-btn-small" id="copy-ori">원어 본문</button>
+                    <div class="range-selector">
+                        <select id="ori-start" class="verse-select"></select>
+                        <span>~</span>
+                        <select id="ori-end" class="verse-select"></select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="settings-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content small-modal">
+            <span id="settings-close" class="close-btn">&times;</span>
+            <h2>설정</h2>
+            <div class="settings-options">
+                <label><input type="checkbox" id="chk-kor" checked> 한글 본문 보기</label>
+                <label><input type="checkbox" id="chk-eng" checked> 영어 본문 보기</label>
+                <label><input type="checkbox" id="chk-ori" checked> 원어 본문 보기</label>
             </div>
         </div>
     </div>

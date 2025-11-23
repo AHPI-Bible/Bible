@@ -47,7 +47,7 @@ def load_csv_to_map(filename, target_map, lang_code=None, is_lexicon=False):
         return
     
     try:
-        # [1절 보장 강화 로직]
+        # 1절 강제 로드 로직 (Header 무시, 숫자면 무조건 로드)
         with open(path, 'r', encoding='utf-8-sig') as f:
             reader = csv.reader(f)
             count = 0
@@ -65,24 +65,19 @@ def load_csv_to_map(filename, target_map, lang_code=None, is_lexicon=False):
                 
                 b, c, v, t = row[0], row[1], row[2], row[3]
 
-                # [핵심] 1절은 어떤 상황에서도 읽어들이도록 강제
                 is_valid = False
-                
-                # 1. 숫자로 변환 가능한지 체크
                 try:
                     c_int = int(c)
                     v_int = int(v)
                     is_valid = True
                 except ValueError:
-                    # 2. 변환 실패 시, 만약 절(v)이 '1'이라는 문자라면 강제 인정
+                    # 숫자가 아니더라도 v가 '1'이면 강제로 읽음 (1절 누락 방지)
                     if v.strip() == '1':
-                        # 장(Chapter)이 숫자가 아닐 수 있으니 1로 가정하거나 최대한 파싱 시도
                         try:
                             c_int = int(c) if c.isdigit() else 1
                             v_int = 1
                             is_valid = True
-                        except:
-                            is_valid = False
+                        except: is_valid = False
                     else:
                         is_valid = False
 
@@ -101,14 +96,12 @@ def load_csv_to_map(filename, target_map, lang_code=None, is_lexicon=False):
     except Exception as e:
         print(f"❌ {filename} 로드 실패: {e}")
 
-# 파일 로드
 load_csv_to_map('korean_bible.csv', korean_map, lang_code='kor')
 load_csv_to_map('english_bible.csv', english_map, lang_code='eng')
 load_csv_to_map('greek_bible.csv', greek_map, lang_code='grk')
 load_csv_to_map('hebrew_bible.csv', hebrew_map, lang_code='heb')
 load_csv_to_map('strong_lexicon.csv', lexicon_map, is_lexicon=True)
 
-# DB 연결
 def get_db_connection():
     if 'DATABASE_URL' in os.environ:
         conn = psycopg2.connect(os.environ['DATABASE_URL'])
@@ -140,7 +133,6 @@ def init_db():
 with app.app_context():
     init_db()
 
-# 원전분해 DB 조회
 def get_analysis_from_sdb(book, chapter, verse):
     sdb_path = os.path.join(base_dir, '원전분해.sdb')
     if not os.path.exists(sdb_path):
@@ -157,7 +149,7 @@ def get_analysis_from_sdb(book, chapter, verse):
         target_table = 'Bible'
         if target_table not in tables:
             conn.close()
-            return {"error": f"DB 오류: '{target_table}' 테이블 없음. 목록: {tables}"}
+            return {"error": f"DB 오류: '{target_table}' 테이블 없음."}
 
         book_id = BOOK_TO_ID.get(book)
         
@@ -178,8 +170,6 @@ def get_analysis_from_sdb(book, chapter, verse):
 
     except Exception as e:
         return {"error": f"DB 쿼리 오류: {str(e)}"}
-
-# --- API 라우트 ---
 
 @app.route('/api/get_chapter_data/<book_name>/<int:chapter_num>', methods=['GET'])
 def get_ahpi_chapter_data(book_name, chapter_num):

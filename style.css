@@ -41,6 +41,7 @@ header {
     color: var(--header-text);
     padding: 1rem;
     flex-shrink: 0;
+    position: relative; /* 설정 버튼 배치를 위해 */
 }
 .header-content {
     display: flex;
@@ -51,6 +52,18 @@ header {
 }
 h1 { margin: 0; font-size: 1.5rem; line-height: 1.2; }
 .sub-title { font-size: 0.9rem; color: #ccc; font-weight: normal; letter-spacing: 1px; }
+
+/* [NEW] 헤더 설정 버튼 */
+.header-settings-btn {
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #fff;
+    cursor: pointer;
+    background: none; border: none;
+}
+.header-settings-btn:hover { color: var(--primary-color); }
 
 .nav-container {
     background-color: var(--card-bg);
@@ -67,7 +80,6 @@ h1 { margin: 0; font-size: 1.5rem; line-height: 1.2; }
 .nav-right-group { display: flex; align-items: center; gap: 10px; margin-left: auto; }
 .history-group, .book-group, .move-group { display: flex; align-items: center; gap: 5px; }
 
-/* 드롭다운 메뉴 */
 .dropdown-wrapper { position: relative; display: inline-block; }
 .dropdown-menu {
     display: none; position: absolute; top: 100%; left: 0;
@@ -115,7 +127,7 @@ h1 { margin: 0; font-size: 1.5rem; line-height: 1.2; }
     scroll-padding-top: 60px; 
 }
 
-/* 좌측 패널 공통 (원전분해, 사전) */
+/* 좌측 패널들 */
 #analysis-panel, #lexicon-panel {
     position: fixed; 
     top: 0; left: 0; bottom: 0;
@@ -136,7 +148,7 @@ h1 { margin: 0; font-size: 1.5rem; line-height: 1.2; }
     display: flex; flex-direction: column; flex-shrink: 0; transition: transform 0.3s ease, width 0.3s ease, flex 0.3s ease; z-index: 900;
 }
 
-/* PC 화면 비율 클래스 */
+/* [NEW] 10:0 비율 포함 PC 레이아웃 */
 @media (min-width: 1025px) {
     body.layout-40-60 #bible-area { flex: 4; }
     body.layout-40-60 #commentary-area { width: 60%; }
@@ -149,6 +161,10 @@ h1 { margin: 0; font-size: 1.5rem; line-height: 1.2; }
 
     body.layout-70-30 #bible-area { flex: 7; }
     body.layout-70-30 #commentary-area { width: 30%; }
+
+    /* 10:0 - 우측 패널 숨김 */
+    body.layout-100-0 #bible-area { flex: 1; }
+    body.layout-100-0 #commentary-area { display: none; }
 }
 
 .panel-header {
@@ -170,6 +186,8 @@ h1 { margin: 0; font-size: 1.5rem; line-height: 1.2; }
     .nav-left-group { gap: 5px; }
     .location-text { font-size: 1rem; }
     #bible-area { padding-top: 40px; }
+    /* 모바일에서 10:0은 무시하고 덮어쓰기 방식 유지 */
+    body.layout-100-0 #commentary-area { display: flex; } 
 }
 
 .verse-item { padding: 15px; border-bottom: 1px solid var(--border-color); display: flex; gap: 12px; }
@@ -200,6 +218,9 @@ h1 { margin: 0; font-size: 1.5rem; line-height: 1.2; }
 .hebrew-text { display: block; font-size: 1.5rem; color: var(--text-color); font-family: serif; direction: rtl; margin-top: 8px; width: 100%; text-align: right;}
 .greek-text { display: block; font-size: 1.3rem; color: var(--text-color); font-family: serif; margin-top: 5px; width: 100%; }
 
+/* [NEW] 본문 숨김 클래스 */
+.verse-line.hidden { display: none !important; }
+
 .hebrew-word { cursor: pointer; }
 .hebrew-word:hover { color: blue; text-decoration: underline; }
 .strong-word { cursor: pointer; color: var(--primary-color); text-decoration: none; }
@@ -215,6 +236,7 @@ textarea { width: 100%; height: 300px; padding: 10px; border: 1px solid var(--bo
 .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--modal-bg); display: flex; justify-content: center; align-items: center; z-index: 2000; }
 .modal-content { background: var(--card-bg); padding: 20px; border-radius: 8px; width: 90%; max-width: 600px; max-height: 80vh; overflow-y: auto; position: relative; color: var(--text-color); }
 .large-modal { max-width: 800px; }
+.medium-modal { max-width: 500px; } /* [NEW] 복사창용 중간 사이즈 */
 .small-modal { max-width: 350px; }
 
 .close-btn { position: absolute; top: 10px; right: 15px; font-size: 24px; cursor: pointer; color: var(--text-sub); }
@@ -234,15 +256,27 @@ mark { background-color: #ffeeba; color: #333; padding: 0 2px; border-radius: 2p
 .analysis-container { display: flex; flex-direction: column; gap: 8px; }
 .analysis-word-item { margin-bottom: 5px; line-height: 1.4; font-size: 1.05rem; }
 
-/* [수정] 원어: 폰트 확대(1.6rem), 진한 파란색 */
 .orig-word { font-size: 1.6rem; font-family: serif; font-weight: bold; color: #00008B; }
 .meaning-text { color: #e83e8c; font-weight: bold; }
 .grammar-arrow { color: #999; font-size: 0.9rem; margin-right: 5px; }
 
 .lexicon-huge-word { font-size: 2rem; font-weight: bold; color: var(--primary-color); font-family: serif; margin-right: 5px; }
 
-.copy-btn { width:100%; padding: 15px; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer; font-size: 1.1rem; text-align: left; transition: 0.2s; margin-bottom:10px; color: var(--text-color); }
-.copy-btn:hover { background: var(--hover-bg); border-color: var(--primary-color); color: var(--primary-color); }
+/* [NEW] 복사 모달 스타일 개선 */
+.copy-row { display: flex; align-items: center; margin-bottom: 15px; justify-content: space-between; }
+.copy-btn-small { 
+    flex: 1; padding: 10px; background: var(--bg-color); border: 1px solid var(--border-color); 
+    border-radius: 4px; cursor: pointer; font-size: 1rem; color: var(--text-color); margin-right: 10px;
+    text-align: center;
+}
+.copy-btn-small:hover { background: var(--hover-bg); border-color: var(--primary-color); }
+.range-selector { display: flex; align-items: center; gap: 5px; flex: 1; }
+.verse-select { padding: 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color); width: 100%; }
+
+/* [NEW] 설정 모달 스타일 */
+.settings-options label { display: block; padding: 10px; border-bottom: 1px solid var(--border-color); cursor: pointer; }
+.settings-options input { margin-right: 10px; }
+
 .grid-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; margin-top: 15px; }
 .grid-btn { padding: 12px 5px; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 5px; text-align: center; cursor: pointer; font-size: 1rem; color: var(--text-color); }
 .grid-btn:hover { background: var(--hover-bg); border-color: #adb5bd; }
