@@ -47,8 +47,9 @@ def load_csv_to_map(filename, target_map, lang_code=None, is_lexicon=False):
         return
     
     try:
-        # [강력 수정] 1절이 절대 누락되지 않도록 헤더 감지 로직 제거하고
-        # 숫자로 변환 가능한 데이터는 무조건 읽습니다.
+        # [1절 강제 표시 로직]
+        # 헤더(제목줄)를 건너뛰는 기본 동작을 무시하고,
+        # 장(Chapter)과 절(Verse)이 숫자로 변환되면 무조건 데이터로 읽습니다.
         with open(path, 'r', encoding='utf-8-sig') as f:
             reader = csv.reader(f)
             count = 0
@@ -56,24 +57,24 @@ def load_csv_to_map(filename, target_map, lang_code=None, is_lexicon=False):
             for row in reader:
                 if not row: continue
 
-                # 사전 처리
+                # 사전(Lexicon) 처리
                 if is_lexicon:
                     if len(row) >= 2:
                         target_map[row[0]] = row[1]
                         count += 1
                     continue
 
-                # 성경 데이터 처리 (최소 4열: Book, Chapter, Verse, Text)
+                # 성경 데이터 처리 (최소 4열)
                 if len(row) < 4: continue
                 
                 b, c, v, t = row[0], row[1], row[2], row[3]
 
-                # [핵심] 장(Chapter)과 절(Verse)이 숫자로 변환되면 무조건 데이터로 인정
                 try:
+                    # 문자가 섞여있어도 숫자로 변환되면 데이터로 인정
                     c_int = int(c)
                     v_int = int(v)
                 except ValueError:
-                    # 숫자가 아니면(제목 줄 등) 건너뜀
+                    # 숫자가 아니면(예: 'Chapter') 건너뜀
                     continue
 
                 key = f"{b}-{c_int}-{v_int}"
@@ -150,7 +151,6 @@ def get_analysis_from_sdb(book, chapter, verse):
 
         book_id = BOOK_TO_ID.get(book)
         
-        # book_id가 있으면 ID로, 없으면 문자열로 조회
         if book_id:
             query = f"SELECT * FROM {target_table} WHERE book = ? AND chapter = ? AND verse = ?"
             cur.execute(query, (book_id, chapter, verse))
@@ -178,7 +178,6 @@ def get_ahpi_chapter_data(book_name, chapter_num):
     greek_verses = {}
     hebrew_verses = {}
     
-    # 1절부터 176절(시편119편 최대)까지 데이터 수집
     for i in range(1, 177):
         key = f"{book_name}-{chapter_num}-{i}"
         if key in korean_map: korean_verses[i] = korean_map[key]

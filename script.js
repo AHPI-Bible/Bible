@@ -39,8 +39,10 @@ let historyStack = [];
 let historyIndex = -1;
 let isHistoryNavigating = false;
 let tempCopyData = { kor: "", eng: "", ori: "", verse: 0 };
-let currentBibleFontSize = 100; // 본문용 %
-let currentCommFontSize = 100;  // 주해용 %
+
+// 폰트 크기 변수 분리
+let currentBibleFontSize = 100; // 본문 %
+let currentCommFontSize = 100;  // 주해 %
 
 document.addEventListener("DOMContentLoaded", function() {
     setupEventListeners();
@@ -57,7 +59,6 @@ function setupEventListeners() {
     document.getElementById("lexicon-close").onclick = () => closeModal("lexicon-modal");
     document.getElementById("search-close").onclick = () => closeModal("search-result-modal");
     document.getElementById("chapter-nav-close").onclick = () => closeModal("chapter-nav-modal");
-    // analysis-modal 관련 코드 삭제 (주해창 통합)
     document.getElementById("copy-close").onclick = () => closeModal("copy-modal");
 
     document.getElementById("btn-ot").onclick = () => openBookGrid("OT");
@@ -80,13 +81,12 @@ function setupEventListeners() {
 
     document.getElementById("btn-dark-mode").onclick = toggleDarkMode;
 
-    // 주해 폰트 조절
-    document.getElementById("btn-comm-font-plus").onclick = () => changeCommFontSize(10);
-    document.getElementById("btn-comm-font-minus").onclick = () => changeCommFontSize(-10);
-    
-    // [NEW] 성경 본문 폰트 조절
+    // [중요] 폰트 조절 버튼 이벤트 (서로 간섭하지 않도록 분리)
     document.getElementById("btn-bible-font-plus").onclick = () => changeBibleFontSize(10);
     document.getElementById("btn-bible-font-minus").onclick = () => changeBibleFontSize(-10);
+    
+    document.getElementById("btn-comm-font-plus").onclick = () => changeCommFontSize(10);
+    document.getElementById("btn-comm-font-minus").onclick = () => changeCommFontSize(-10);
 }
 
 function toggleDarkMode() {
@@ -94,26 +94,29 @@ function toggleDarkMode() {
     localStorage.setItem('theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light');
 }
 
-function changeCommFontSize(delta) {
-    currentCommFontSize += delta;
-    if(currentCommFontSize < 70) currentCommFontSize = 70;
-    if(currentCommFontSize > 200) currentCommFontSize = 200;
-    
-    const wrapper = document.getElementById("commentary-content-wrapper");
-    if(wrapper) {
-        // rem 단위로 변환해서 적용
-        wrapper.style.fontSize = `${1.0 * (currentCommFontSize/100)}rem`;
-    }
-}
-
+// 왼쪽(성경 본문) 폰트 조절
 function changeBibleFontSize(delta) {
     currentBibleFontSize += delta;
     if(currentBibleFontSize < 70) currentBibleFontSize = 70;
-    if(currentBibleFontSize > 200) currentBibleFontSize = 200;
+    if(currentBibleFontSize > 250) currentBibleFontSize = 250;
     
     const bibleList = document.getElementById("bible-list");
     if(bibleList) {
         bibleList.style.fontSize = `${currentBibleFontSize}%`;
+    }
+}
+
+// 오른쪽(주해) 폰트 조절
+function changeCommFontSize(delta) {
+    currentCommFontSize += delta;
+    if(currentCommFontSize < 70) currentCommFontSize = 70;
+    if(currentCommFontSize > 250) currentCommFontSize = 250;
+    
+    // 주해 텍스트 영역
+    const displayDiv = document.getElementById("commentary-display");
+    if(displayDiv) {
+        // rem 단위로 미세 조정
+        displayDiv.style.fontSize = `${1.1 * (currentCommFontSize/100)}rem`;
     }
 }
 
@@ -189,7 +192,7 @@ async function fetchChapterData(book, chapter) {
         }
 
         renderBibleList(maxVerse);
-        // 기본적으로 1절 선택
+        // [중요] 로드 후 1절로 자동 스크롤 및 선택
         selectVerse(1);
     } catch (error) {
         console.error(error);
@@ -200,7 +203,6 @@ async function fetchChapterData(book, chapter) {
 function renderBibleList(maxVerse) {
     const list = document.getElementById("bible-list");
     list.innerHTML = "";
-    // 폰트 크기 유지
     list.style.fontSize = `${currentBibleFontSize}%`;
 
     if (maxVerse === 0) { list.innerHTML = "<p>본문이 없습니다.</p>"; return; }
@@ -228,7 +230,7 @@ function renderBibleList(maxVerse) {
         const korHtml = renderTextWithStrongs(korRaw, "kor");
         const engHtml = renderTextWithStrongs(engRaw, "eng");
 
-        // [수정] 아이콘 순서: 복사 -> 주해 -> 원전분해
+        // 아이콘 배치 순서: 복사 -> 주해 -> 원전분해
         let html = `
             <div class="left-column">
                 <div class="verse-num">${i}.</div>
@@ -271,23 +273,18 @@ function renderBibleList(maxVerse) {
 
 function handleCommentaryClick(verseNum) {
     selectVerse(verseNum); 
-    // 모바일이면 패널 열기
     if (window.innerWidth <= 768) {
         document.getElementById("commentary-area").classList.add("show");
     }
 }
 
-// [핵심 기능] 원전 분해 데이터 파싱 및 주해창에 표시
+// 원전 분해 로드
 async function loadAnalysisToPanel(book, chapter, verse) {
-    // 1. 패널 열기
     const panel = document.getElementById("commentary-area");
     panel.classList.add("show");
     
-    // 2. 주해창 내용을 "로딩중"으로 변경
     const displayDiv = document.getElementById("commentary-display");
     displayDiv.innerHTML = "<p>원전 데이터를 분석 중입니다...</p>";
-    
-    // 3. 에디터는 숨김
     closeEditor();
 
     try {
@@ -304,19 +301,14 @@ async function loadAnalysisToPanel(book, chapter, verse) {
             return;
         }
 
-        // 헤더 생성
         const bookName = KOREAN_BOOK_NAMES[book] || book;
         let html = `
             <div class="analysis-header-line">원전 분해 (${bookName} ${chapter}:${verse})</div>
             <div class="analysis-container">
         `;
 
-        // 4. 데이터 파싱 및 렌더링
         data.forEach(item => {
-            // btext 혹은 text 컬럼 사용
             let rawText = item['btext'] || item['text'] || "";
-            
-            // 만약 컬럼명을 정확히 모르면 긴 텍스트 찾기
             if (!rawText) {
                 const ignoreKeys = ['book', 'chapter', 'id', 'verse'];
                 for (const key in item) {
@@ -326,15 +318,8 @@ async function loadAnalysisToPanel(book, chapter, verse) {
                     }
                 }
             }
-
-            // 파싱 로직 적용
             const parsedHTML = parseAnalysisText(rawText);
-            
-            html += `
-                <div class="analysis-block">
-                    ${parsedHTML}
-                </div>
-            `;
+            html += `<div class="analysis-block">${parsedHTML}</div>`;
         });
 
         html += `</div>`;
@@ -346,41 +331,20 @@ async function loadAnalysisToPanel(book, chapter, verse) {
     }
 }
 
-// [신규] 원전 분해 텍스트 파서
-// 입력 예: [베레쉬트] (기본 [레쉬트] ...) @전치사 ... # 태초에 *
+// 원전 분해 파서
 function parseAnalysisText(text) {
     if (!text) return "";
-
-    // 1. '*' 기준으로 단어 덩어리 나누기
     const chunks = text.split('*');
     let resultHtml = "";
 
     chunks.forEach(chunk => {
         if (!chunk.trim()) return;
-
         let processed = chunk;
-
-        // 2. 대괄호 [] 안의 원어 -> 폰트 키우기
-        // 예: [베레쉬트] -> <span class="orig-word">베레쉬트</span>
-        // 중첩 대괄호가 있을 수 있으므로 단순 replace보다 정규식 사용
-        // (기본 [레쉬트] ...) 처럼 괄호 안에 대괄호가 있는 경우도 고려
-        
-        // 가장 바깥의 [ ] 찾기 (단어 원형)
-        // 단순화를 위해 모든 [ ] 내용을 키우되, ( ) 안에 있는 [ ]는 조금 작게 할 수도 있지만
-        // 요청 사항은 "원어 폰트는 한글보다 2포인트 크게"
-        
         processed = processed.replace(/\[(.*?)\]/g, '<span class="orig-word">$1</span>');
-
-        // 3. '#' 뒤의 의미 텍스트 -> 파란색 굵게
-        // # 부터 문장 끝(혹은 다음 특수문자 전)까지
         processed = processed.replace(/#\s*(.*?)(?=$|<)/g, '<span class="meaning-text">$1</span>');
-
-        // 4. '@' -> 줄바꿈 + 화살표
         processed = processed.replace(/@/g, '<br><span class="grammar-arrow">→</span> ');
-
         resultHtml += `<div class="analysis-word-item">${processed}</div>`;
     });
-
     return resultHtml;
 }
 
@@ -491,6 +455,8 @@ function makeHebrewWordsClickable() {
         span.addEventListener('click', (e) => { e.stopPropagation(); });
     });
 }
+
+// [NEW] 사전 팝업: ^ 앞 단어 폰트 2배
 async function openLexiconModal(code, word) {
     const modal = document.getElementById("lexicon-modal");
     const modalBody = document.getElementById("modal-body");
@@ -499,22 +465,40 @@ async function openLexiconModal(code, word) {
         const res = await fetch(`${AHPI_API_BASE_URL}/lexicon/${code}`);
         const data = await res.json();
         let html = `<h3 style="font-size:1.5rem; color:#007bff; text-align:center;">${word} (${code})</h3>`;
-        if (data.content && data.content !== "사전 데이터가 없습니다.") html += `<div style="text-align:left; margin-top:15px; line-height:1.6; font-size:1rem;">${data.content}</div>`;
-        else {
+        
+        if (data.content && data.content !== "사전 데이터가 없습니다.") {
+            // [중요] ^ 바로 앞 단어 찾아서 폰트 키우기
+            // 예: "some word^" -> "<span class='lexicon-huge-word'>word</span>"
+            // 정규식: (공백이 아닌 문자들)\^
+            let content = data.content;
+            
+            // ^ 앞 단어 매칭 및 치환
+            content = content.replace(/([^\s]+)\^/g, '<span class="lexicon-huge-word">$1</span>');
+            // 남은 ^ 제거 (선택사항, 보통 제거함)
+            content = content.replace(/\^/g, '');
+
+            html += `<div style="text-align:left; margin-top:15px; line-height:1.6; font-size:1rem;">${content}</div>`;
+        } else {
             let link = code.startsWith('H') ? `https://biblehub.com/hebrew/${code.substring(1)}.htm` : `https://biblehub.com/greek/${code.substring(1)}.htm`;
             html += `<p style="color:red; text-align:center;">사전 데이터 없음</p><div style="text-align:center; margin-top:15px;"><a href="${link}" target="_blank" style="padding:8px; background:#eee; border-radius:5px;">BibleHub에서 보기</a></div>`;
         }
         modalBody.innerHTML = html;
     } catch (err) { modalBody.innerHTML = "<p>통신 오류</p>"; }
 }
+
 function selectVerse(verseNum) {
     currentVerse = verseNum;
     document.querySelectorAll(".verse-item").forEach(el => el.classList.remove("selected"));
     const targetRow = document.getElementById(`verse-row-${verseNum}`);
     if (targetRow) targetRow.classList.add("selected");
+    
+    // 모바일 등에서 1절이 가려지지 않게 스크롤 조정 (헤더 높이 고려)
+    if(verseNum === 1 && targetRow) {
+        targetRow.scrollIntoView({ block: "center" });
+    }
+
     document.getElementById("current-verse-display").innerText = `${KOREAN_BOOK_NAMES[currentBook]||currentBook} ${currentChapter}:${verseNum}`;
     const comment = loadedChapterData.commentaries[verseNum];
-    // 주해 내용 표시 (원전분해가 떠있을 수 있으므로 덮어씀)
     document.getElementById("commentary-display").innerText = comment ? comment : "작성된 주해가 없습니다.";
     closeEditor();
 }
