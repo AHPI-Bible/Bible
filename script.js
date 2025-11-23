@@ -1,7 +1,8 @@
-// Render 서버
-const AHPI_API_BASE_URL = "https://ahpi-bible-backend.onrender.com/api";
-// 로컬 테스트
-// const AHPI_API_BASE_URL = "http://127.0.0.1:5000/api";
+// Render 서버 (배포 시 주석 해제)
+// const AHPI_API_BASE_URL = "https://ahpi-bible-backend.onrender.com/api";
+
+// 로컬 테스트 (현재 사용 중)
+const AHPI_API_BASE_URL = "http://127.0.0.1:5000/api";
 
 const BIBLE_DATA = {
     "Genesis": 50, "Exodus": 40, "Leviticus": 27, "Numbers": 36, "Deuteronomy": 34,
@@ -46,19 +47,9 @@ let historyIndex = -1;
 let isHistoryNavigating = false;
 let tempCopyData = { kor: "", eng: "", ori: "", verse: 0 };
 
-// 로그인 및 권한 상태
-let currentUser = {
-    isAuthenticated: false,
-    id: null,
-    grade: 0, 
-    displayName: '비회원'
-}; 
-const GRADE_AUTHORIZATION = {
-    OPEN_COMMENTARY_WRITE: 3, 
-    AHPI_COMMENTARY_WRITE: 4, 
-    READ_ADVANCED: 2 
-};
-let currentEditorMode = 'open'; // 'open' or 'ahpi'
+let currentUser = { isAuthenticated: false, id: null, grade: 0, displayName: '비회원' }; 
+const GRADE_AUTHORIZATION = { OPEN_COMMENTARY_WRITE: 3, AHPI_COMMENTARY_WRITE: 4, READ_ADVANCED: 2 };
+let currentEditorMode = 'open';
 
 let currentBibleFontSize = 100;
 let currentCommFontSize = 100;
@@ -68,12 +59,9 @@ const layoutClasses = ["layout-40-60", "layout-50-50", "layout-60-40", "layout-7
 document.addEventListener("DOMContentLoaded", function() {
     setupEventListeners();
     loadChapter(currentBook, currentChapter, true);
-    if(localStorage.getItem('theme') === 'dark') {
-        document.body.classList.add('dark-mode');
-    }
+    if(localStorage.getItem('theme') === 'dark') document.body.classList.add('dark-mode');
     const savedLayout = localStorage.getItem('layoutRatio') || "layout-60-40";
     document.body.classList.add(savedLayout);
-    
     updateAuthorizationUI();
 });
 
@@ -86,18 +74,13 @@ function setupEventListeners() {
     document.getElementById("copy-close").onclick = () => closeModal("copy-modal");
     document.getElementById("settings-close").onclick = () => closeModal("settings-modal");
     
-    // 로그인 관련
     document.getElementById("login-modal-close").onclick = () => closeModal("login-modal");
     document.getElementById("login-submit-btn").onclick = handleLogin;
-    
     const headerLoginBtn = document.getElementById("header-login-btn");
     if (headerLoginBtn) {
         headerLoginBtn.onclick = () => { 
-            if (currentUser.isAuthenticated) {
-                handleLogout();
-            } else {
-                document.getElementById("login-modal").style.display = "flex";
-            }
+            if (currentUser.isAuthenticated) handleLogout();
+            else document.getElementById("login-modal").style.display = "flex";
         };
     }
 
@@ -121,13 +104,9 @@ function setupEventListeners() {
 
     document.getElementById("close-analysis-btn").onclick = closeAnalysisPanel;
     document.getElementById("close-lexicon-btn").onclick = closeLexiconPanel;
-    
     document.getElementById("close-commentary-btn").onclick = () => {
-        if(window.innerWidth <= 768) {
-            toggleCommentary();
-        } else {
-            applyLayout("layout-100-0");
-        }
+        if(window.innerWidth <= 768) toggleCommentary();
+        else applyLayout("layout-100-0");
     };
 
     document.getElementById("btn-layout-header").onclick = () => {
@@ -150,11 +129,9 @@ function setupEventListeners() {
     document.getElementById("copy-kor").onclick = () => copyVerseRange("kor");
     document.getElementById("copy-eng").onclick = () => copyVerseRange("eng");
     document.getElementById("copy-ori").onclick = () => copyVerseRange("ori");
-    
     document.getElementById("kor-start").onchange = () => updateEndDropdown("kor");
     document.getElementById("eng-start").onchange = () => updateEndDropdown("eng");
     document.getElementById("ori-start").onchange = () => updateEndDropdown("ori");
-
     document.getElementById("kor-end").onchange = () => copyVerseRange("kor");
     document.getElementById("eng-end").onchange = () => copyVerseRange("eng");
     document.getElementById("ori-end").onchange = () => copyVerseRange("ori");
@@ -167,22 +144,57 @@ function setupEventListeners() {
     document.getElementById("chk-ori").onchange = () => toggleBibleVersionVisibility("ori");
 }
 
+// --- [누락되었던 네비게이션 함수들 복구] ---
+function goToNextChapter() {
+    if(currentChapter < BIBLE_DATA[currentBook]) loadChapter(currentBook, currentChapter + 1, true);
+    else {
+        const idx = OT_BOOKS.concat(NT_BOOKS).indexOf(currentBook);
+        if(idx < ALL_BOOKS.length-1) loadChapter(ALL_BOOKS[idx+1], 1, true);
+    }
+}
+function goToPrevChapter() {
+    if(currentChapter > 1) loadChapter(currentBook, currentChapter - 1, true);
+    else {
+        const idx = OT_BOOKS.concat(NT_BOOKS).indexOf(currentBook);
+        if(idx > 0) loadChapter(ALL_BOOKS[idx-1], BIBLE_DATA[ALL_BOOKS[idx-1]], true);
+    }
+}
+function goHistoryBack() {
+    if (historyIndex > 0) { 
+        historyIndex--; isHistoryNavigating = true; 
+        loadChapter(historyStack[historyIndex].book, historyStack[historyIndex].chapter, false); 
+        updateHistoryButtons(); 
+    }
+}
+function goHistoryForward() {
+    if (historyIndex < historyStack.length - 1) { 
+        historyIndex++; isHistoryNavigating = true; 
+        loadChapter(historyStack[historyIndex].book, historyStack[historyIndex].chapter, false); 
+        updateHistoryButtons(); 
+    }
+}
+function addToHistory(book, chapter) {
+    if (historyIndex >= 0) { const curr = historyStack[historyIndex]; if (curr.book === book && curr.chapter === chapter) return; }
+    historyStack = historyStack.slice(0, historyIndex + 1);
+    historyStack.push({ book, chapter });
+    historyIndex++;
+    updateHistoryButtons();
+}
+function updateHistoryButtons() {
+    document.getElementById("hist-back-btn").style.opacity = (historyIndex <= 0) ? "0.5" : "1";
+    document.getElementById("hist-fwd-btn").style.opacity = (historyIndex >= historyStack.length - 1) ? "0.5" : "1";
+}
+
+// --- [나머지 핵심 함수들] ---
+
 function updateAuthorizationUI() {
     const editBtn = document.getElementById("edit-btn");
     const headerLoginBtn = document.getElementById("header-login-btn"); 
-    
-    if (currentUser.grade >= GRADE_AUTHORIZATION.OPEN_COMMENTARY_WRITE) {
-        editBtn.style.display = 'block';
-    } else {
-        editBtn.style.display = 'none';
-    }
-
+    if (currentUser.grade >= GRADE_AUTHORIZATION.OPEN_COMMENTARY_WRITE) editBtn.style.display = 'block';
+    else editBtn.style.display = 'none';
     if (headerLoginBtn) {
-        if (currentUser.isAuthenticated) {
-            headerLoginBtn.innerText = `${currentUser.displayName} (Grade ${currentUser.grade} / 로그아웃)`;
-        } else {
-            headerLoginBtn.innerText = '로그인';
-        }
+        if (currentUser.isAuthenticated) headerLoginBtn.innerText = `${currentUser.displayName} (Grade ${currentUser.grade} / 로그아웃)`;
+        else headerLoginBtn.innerText = '로그인';
     }
 }
 
@@ -190,28 +202,21 @@ async function handleLogin() {
     const username = document.getElementById("login-username").value;
     const password = document.getElementById("login-password").value;
     const msgElement = document.getElementById("login-message");
-    
     msgElement.innerText = "로그인 중...";
-
     try {
         const res = await fetch(`${AHPI_API_BASE_URL}/login`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            method: 'POST', headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ username, password })
         });
-
         const result = await res.json();
-
         if (res.ok && result.is_authenticated) {
             currentUser.isAuthenticated = true;
             currentUser.id = result.user_id;
             currentUser.grade = result.grade;
             currentUser.displayName = result.display_name;
-
             document.getElementById("login-modal").style.display = "none";
             showToast(`로그인 성공! ${currentUser.displayName}님 환영합니다.`);
             updateAuthorizationUI();
-            
         } else {
             msgElement.innerText = result.message || "로그인 실패";
         }
@@ -227,15 +232,11 @@ function handleLogout() {
     updateAuthorizationUI();
 }
 
-// 편집기 모드 설정 함수
 function setEditorMode(type) {
     currentEditorMode = type;
     const contentInput = document.getElementById("commentary-input");
-    
-    // 버튼 스타일 (index.html에서 CSS 추가 필요할 수 있음)
     const openBtn = document.getElementById("mode-open-btn");
     const ahpiBtn = document.getElementById("mode-ahpi-btn");
-    
     if(openBtn) {
         openBtn.style.fontWeight = type === 'open' ? 'bold' : 'normal';
         openBtn.style.backgroundColor = type === 'open' ? '#ddd' : '#f9f9f9';
@@ -244,11 +245,9 @@ function setEditorMode(type) {
         ahpiBtn.style.fontWeight = type === 'ahpi' ? 'bold' : 'normal';
         ahpiBtn.style.backgroundColor = type === 'ahpi' ? '#ddd' : '#f9f9f9';
     }
-    
     const content = (type === 'ahpi') 
         ? (loadedChapterData.ahpiCommentaries[currentVerse] || "") 
         : (loadedChapterData.openCommentaries[currentVerse] || "");
-        
     contentInput.value = content;
 }
 
@@ -257,15 +256,12 @@ function openEditor() {
         showToast("작성 권한이 없습니다.");
         return;
     }
-    
     document.getElementById("commentary-display").style.display = "none";
     document.getElementById("edit-btn").style.display = "none";
     document.getElementById("editor-container").style.display = "block";
     
-    // AHPI/Open 모드 버튼 생성
     const editorModeContainer = document.getElementById("editor-mode-select");
     const isAhpiAuthor = currentUser.grade >= GRADE_AUTHORIZATION.AHPI_COMMENTARY_WRITE;
-    
     let initialType = 'open';
     if (isAhpiAuthor) {
         editorModeContainer.innerHTML = `
@@ -274,13 +270,10 @@ function openEditor() {
         `;
         document.getElementById("mode-open-btn").onclick = () => setEditorMode('open');
         document.getElementById("mode-ahpi-btn").onclick = () => setEditorMode('ahpi');
-        
-        // 기존 내용이 있는 쪽을 우선 보여주거나, AHPI 우선
         if(loadedChapterData.ahpiCommentaries[currentVerse]) initialType = 'ahpi';
     } else {
         editorModeContainer.innerHTML = '<span style="font-size:0.9em; color:#666;">Open 주해 작성 모드</span>';
     }
-    
     setEditorMode(initialType);
 }
 
@@ -296,37 +289,22 @@ async function saveCommentary() {
         closeEditor();
         return;
     }
-    
     const content = document.getElementById("commentary-input").value;
     const btn = document.getElementById("save-btn");
     btn.innerText = "저장 중...";
-    
     const commentaryType = currentEditorMode; 
-    
     const res = await fetch(`${AHPI_API_BASE_URL}/save_commentary`, {
         method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ 
-            book: currentBook, 
-            chapter: currentChapter, 
-            verse: currentVerse, 
-            content: content, 
-            commentary_type: commentaryType, 
-            user_id: currentUser.id 
-        })
+        body: JSON.stringify({ book: currentBook, chapter: currentChapter, verse: currentVerse, content: content, commentary_type: commentaryType, user_id: currentUser.id })
     });
-    
     if(res.ok) {
         showToast("저장 완료");
-        if (commentaryType === 'ahpi') {
-            loadedChapterData.ahpiCommentaries[currentVerse] = content;
-        } else {
-            loadedChapterData.openCommentaries[currentVerse] = content;
-        }
+        if (commentaryType === 'ahpi') loadedChapterData.ahpiCommentaries[currentVerse] = content;
+        else loadedChapterData.openCommentaries[currentVerse] = content;
     } else {
         const errData = await res.json();
         alert("저장 실패: " + (errData.error || "알 수 없는 오류"));
     }
-
     selectVerse(currentVerse);
     const row = document.getElementById(`verse-row-${currentVerse}`);
     if (row) {
@@ -360,11 +338,8 @@ function changeCommFontSize(delta) {
 
 function toggleCommentary() {
     const panel = document.getElementById("commentary-area");
-    if(panel.classList.contains("show")) {
-        panel.classList.remove("show");
-    } else {
-        panel.classList.add("show");
-    }
+    if(panel.classList.contains("show")) panel.classList.remove("show");
+    else panel.classList.add("show");
 }
 
 function closeAnalysisPanel() {
@@ -410,19 +385,16 @@ function copyVerseRange(lang) {
     const start = parseInt(document.getElementById(`${lang}-start`).value);
     const end = parseInt(document.getElementById(`${lang}-end`).value);
     if(start > end) return;
-
     let copyText = "";
     const info = BOOK_INFO[currentBook] || { abbr: currentBook.substring(0,1) };
     let abbr = info.abbr; 
     if(KOREAN_BOOK_NAMES[currentBook]) abbr = KOREAN_BOOK_NAMES[currentBook].substring(0,1);
     if(KOREAN_BOOK_NAMES[currentBook] && KOREAN_BOOK_NAMES[currentBook].length >= 4) abbr = KOREAN_BOOK_NAMES[currentBook].substring(0,2);
-
     for(let i=start; i<=end; i++) {
         let text = "";
         if(lang === 'kor') text = loadedChapterData.korean[i];
         else if(lang === 'eng') text = (Array.isArray(loadedChapterData.english) ? loadedChapterData.english[i-1] : loadedChapterData.english[i]);
         else text = loadedChapterData.original[i-1];
-
         if(text) {
             const cleanText = text.replace(/<[^>]*>?/gm, '');
             copyText += `${abbr} ${currentChapter}:${i} ${cleanText}\n`;
@@ -433,12 +405,7 @@ function copyVerseRange(lang) {
 
 function toggleBibleVersionVisibility(type) {
     const isChecked = document.getElementById(`chk-${type}`).checked;
-    let targetClass = "";
-    if(type === 'kor') targetClass = ".korean-text";
-    else if(type === 'eng') targetClass = ".english-text";
-    else targetClass = ".hebrew-text"; 
-
-    const elements = document.querySelectorAll(targetClass);
+    const elements = document.querySelectorAll(type === 'kor' ? ".korean-text" : (type === 'eng' ? ".english-text" : ".hebrew-text"));
     elements.forEach(el => {
         if(isChecked) el.closest('.verse-line').classList.remove('hidden');
         else el.closest('.verse-line').classList.add('hidden');
@@ -476,7 +443,6 @@ async function fetchChapterData(book, chapter) {
         else loadedChapterData.original = ahpiData.hebrew_verses || {};
 
         const maxVerse = Math.max(Object.keys(loadedChapterData.korean).length, Object.keys(loadedChapterData.english).length);
-
         if (!Array.isArray(loadedChapterData.english)) {
              let engArr = [];
              for(let i=1; i<=maxVerse; i++) engArr.push(loadedChapterData.english[i] || "");
@@ -485,7 +451,6 @@ async function fetchChapterData(book, chapter) {
 
         renderBibleList(maxVerse);
         selectVerse(1);
-        
         toggleBibleVersionVisibility('kor');
         toggleBibleVersionVisibility('eng');
         toggleBibleVersionVisibility('ori');
@@ -500,7 +465,6 @@ function renderBibleList(maxVerse) {
     const list = document.getElementById("bible-list");
     list.innerHTML = "";
     list.style.fontSize = `${currentBibleFontSize}%`;
-
     if (maxVerse === 0) { list.innerHTML = "<p>본문이 없습니다.</p>"; return; }
 
     const isNT = NT_BOOKS.includes(currentBook);
@@ -510,7 +474,6 @@ function renderBibleList(maxVerse) {
         const div = document.createElement("div");
         div.className = "verse-item";
         div.id = `verse-row-${i}`; 
-        
         div.onclick = (e) => {
             if(e.target.closest('.left-column') || e.target.closest('.strong-word') || e.target.closest('.hebrew-word')) return;
             selectVerse(i);
@@ -519,68 +482,41 @@ function renderBibleList(maxVerse) {
         const korRaw = loadedChapterData.korean[i] || "";
         const engRaw = Array.isArray(loadedChapterData.english) ? (loadedChapterData.english[i-1] || "") : (loadedChapterData.english[i] || "");
         const ori = loadedChapterData.original[i-1] || "";
-        
         const hasCommentary = loadedChapterData.ahpiCommentaries[i] || loadedChapterData.openCommentaries[i];
         const commIconClass = hasCommentary ? "material-icons left-icon-btn comm-icon has-content" : "material-icons left-icon-btn comm-icon";
 
-        const korHtml = renderTextWithStrongs(korRaw, "kor");
-        const engHtml = renderTextWithStrongs(engRaw, "eng");
-
-        let html = `
+        div.innerHTML = `
             <div class="left-column">
                 <div class="verse-num">${i}.</div>
                 <div class="material-icons left-icon-btn copy-icon-left" title="복사" 
-                     onclick="openCopyModal('${korRaw.replace(/'/g, "\\'")}', '${engRaw.replace(/'/g, "\\'")}', '${ori.replace(/'/g, "\\'")}', ${i})">
-                     content_copy
-                </div>
+                     onclick="openCopyModal('${korRaw.replace(/'/g, "\\'")}', '${engRaw.replace(/'/g, "\\'")}', '${ori.replace(/'/g, "\\'")}', ${i})">content_copy</div>
                 <div class="${commIconClass}" title="주해 보기" 
-                     onclick="handleCommentaryClick(${i})">
-                     article
-                </div>
+                     onclick="handleCommentaryClick(${i})">article</div>
                 <div class="left-icon-btn analysis-icon" title="원전 분해" 
-                     onclick="handleAnalysisClick('${currentBook}', ${currentChapter}, ${i})">
-                     ${analysisIcon}
-                </div>
+                     onclick="handleAnalysisClick('${currentBook}', ${currentChapter}, ${i})">${analysisIcon}</div>
             </div>
-            
             <div class="text-column">
-                <div class="verse-line">
-                    <span class="korean-text">${korHtml}</span>
-                </div>
-                <div class="verse-line">
-                    <span class="english-text">${engHtml}</span>
-                </div>
-                <div class="verse-line">
-                    <span class="hebrew-text" ${isNT ? '' : 'dir="rtl"'}>${renderOriginalText(ori)}</span>
-                </div>
+                <div class="verse-line"><span class="korean-text">${renderTextWithStrongs(korRaw, "kor")}</span></div>
+                <div class="verse-line"><span class="english-text">${renderTextWithStrongs(engRaw, "eng")}</span></div>
+                <div class="verse-line"><span class="hebrew-text" ${isNT ? '' : 'dir="rtl"'}>${renderOriginalText(ori)}</span></div>
             </div>
         `;
-        div.innerHTML = html;
         list.appendChild(div);
     }
-    
     attachStrongClickEvents();
     makeHebrewWordsClickable();
 }
 
 function handleCommentaryClick(verseNum) {
     selectVerse(verseNum); 
-    if (window.innerWidth <= 768) {
-        document.getElementById("commentary-area").classList.add("show");
-    } else {
-        if(document.body.classList.contains('layout-100-0')) {
-            applyLayout("layout-60-40");
-        }
-    }
+    if (window.innerWidth <= 768) document.getElementById("commentary-area").classList.add("show");
+    else if(document.body.classList.contains('layout-100-0')) applyLayout("layout-60-40");
 }
 
 function handleAnalysisClick(book, chapter, verse) {
-    if (window.innerWidth <= 1024) {
-        loadAnalysisToLeftPanel(book, chapter, verse);
-    } else {
-        if(document.body.classList.contains('layout-100-0')) {
-            applyLayout("layout-60-40");
-        }
+    if (window.innerWidth <= 1024) loadAnalysisToLeftPanel(book, chapter, verse);
+    else {
+        if(document.body.classList.contains('layout-100-0')) applyLayout("layout-60-40");
         loadAnalysisToRightPanel(book, chapter, verse);
     }
 }
@@ -588,82 +524,46 @@ function handleAnalysisClick(book, chapter, verse) {
 async function loadAnalysisToLeftPanel(book, chapter, verse) {
     const panel = document.getElementById("analysis-panel");
     panel.classList.add("show");
-    const contentDiv = document.getElementById("analysis-content");
-    contentDiv.innerHTML = "<p style='padding:10px;'>원전 데이터를 분석 중입니다...</p>";
-    await fetchAndRenderAnalysis(book, chapter, verse, contentDiv);
+    document.getElementById("analysis-content").innerHTML = "<p style='padding:10px;'>원전 데이터를 분석 중입니다...</p>";
+    await fetchAndRenderAnalysis(book, chapter, verse, document.getElementById("analysis-content"));
 }
 
 async function loadAnalysisToRightPanel(book, chapter, verse) {
     const panel = document.getElementById("commentary-area");
     panel.classList.add("show");
-    const contentDiv = document.getElementById("commentary-display");
-    contentDiv.innerHTML = "<p>원전 데이터를 분석 중입니다...</p>";
+    document.getElementById("commentary-display").innerHTML = "<p>원전 데이터를 분석 중입니다...</p>";
     closeEditor(); 
-    await fetchAndRenderAnalysis(book, chapter, verse, contentDiv);
+    await fetchAndRenderAnalysis(book, chapter, verse, document.getElementById("commentary-display"));
 }
 
 async function fetchAndRenderAnalysis(book, chapter, verse, targetElement) {
     try {
         const res = await fetch(`${AHPI_API_BASE_URL}/analysis/${book}/${chapter}/${verse}`);
         const data = await res.json();
+        if (data.error) { targetElement.innerHTML = `<p style="color:red; font-weight:bold; padding:10px;">${data.error}</p>`; return; }
+        if (data.length === 0) { targetElement.innerHTML = "<p style='padding:10px;'>분해 데이터가 없습니다.</p>"; return; }
 
-        if (data.error) {
-            targetElement.innerHTML = `<p style="color:red; font-weight:bold; padding:10px;">${data.error}</p>`;
-            return;
-        }
-
-        if (data.length === 0) {
-            targetElement.innerHTML = "<p style='padding:10px;'>분해 데이터가 없습니다.</p>";
-            return;
-        }
-
-        const bookName = KOREAN_BOOK_NAMES[book] || book;
-        let html = `<div class="analysis-header-line" style="margin:10px;">${bookName} ${chapter}:${verse}</div>
-                    <div class="analysis-container" style="padding:10px;">`;
-
+        let html = `<div class="analysis-header-line" style="margin:10px;">${KOREAN_BOOK_NAMES[book] || book} ${chapter}:${verse}</div><div class="analysis-container" style="padding:10px;">`;
         data.forEach(item => {
             let rawText = item['btext'] || item['text'] || "";
-            if (!rawText) {
-                const ignoreKeys = ['book', 'chapter', 'id', 'verse'];
-                for (const key in item) {
-                    if (!ignoreKeys.includes(key.toLowerCase()) && typeof item[key] === 'string' && item[key].length > 5) {
-                        rawText = item[key];
-                        break; 
-                    }
-                }
-            }
-            const parsedHTML = parseAnalysisText(rawText);
-            html += `<div class="analysis-block">${parsedHTML}</div>`;
+            html += `<div class="analysis-block">${parseAnalysisText(rawText)}</div>`;
         });
-
         html += `</div>`;
         targetElement.innerHTML = html;
-
-    } catch (err) {
-        targetElement.innerHTML = "<p style='color:red; padding:10px;'>서버 통신 오류</p>";
-    }
+    } catch (err) { targetElement.innerHTML = "<p style='color:red; padding:10px;'>서버 통신 오류</p>"; }
 }
 
 function parseAnalysisText(text) {
     if (!text) return "";
-    const chunks = text.split('*');
     let resultHtml = "";
-
-    chunks.forEach(chunk => {
+    text.split('*').forEach(chunk => {
         if (!chunk.trim()) return;
         let processed = chunk;
-        
         const codeMatch = processed.match(/\(기본 \[(.*?)\]/); 
         const code = codeMatch ? codeMatch[1] : '';
-
         processed = processed.replace(/\[(.*?)\]/, (match, word) => {
-            if (code) {
-                return `<span class="orig-word" onclick="openLexiconModal('${code}', '${word}')">${word}</span>`;
-            } else {
-                return `<span class="orig-word">${word}</span>`;
-            }
+            return code ? `<span class="orig-word" onclick="openLexiconModal('${code}', '${word}')">${word}</span>` : `<span class="orig-word">${word}</span>`;
         });
-
         processed = processed.replace(/#\s*(.*?)(?=$|<)/g, '<span class="meaning-text">$1</span>');
         processed = processed.replace(/@/g, '<br><span class="grammar-arrow">→</span> ');
         resultHtml += `<div class="analysis-word-item">${processed}</div>`;
@@ -672,17 +572,12 @@ function parseAnalysisText(text) {
 }
 
 function renderOriginalText(text) {
-    const words = text.split(/\s+/).filter(w => w.length > 0);
-    let html = "";
-    words.forEach(word => {
+    return text.split(/\s+/).filter(w => w.length > 0).map(word => {
         if (/[\u0590-\u05FF]/.test(word) || /[\u0370-\u03FF\u1F00-\u1FFF]/.test(word)) {
-            const cleanData = word.replace(/['".,;:]/g, '');
-            html += `<span class="hebrew-word" data-word="${cleanData}">${word}</span> `;
-        } else {
-            html += `${word} `;
+            return `<span class="hebrew-word" data-word="${word.replace(/['".,;:]/g, '')}">${word}</span> `;
         }
-    });
-    return html;
+        return `${word} `;
+    }).join("");
 }
 
 function showToast(msg) {
@@ -691,31 +586,14 @@ function showToast(msg) {
     toast.classList.remove("hidden");
     setTimeout(() => toast.classList.add("hidden"), 1000);
 }
-function addToHistory(book, chapter) {
-    if (historyIndex >= 0) { const curr = historyStack[historyIndex]; if (curr.book === book && curr.chapter === chapter) return; }
-    historyStack = historyStack.slice(0, historyIndex + 1);
-    historyStack.push({ book, chapter });
-    historyIndex++;
-    updateHistoryButtons();
-}
-function goHistoryBack() {
-    if (historyIndex > 0) { historyIndex--; isHistoryNavigating = true; loadChapter(historyStack[historyIndex].book, historyStack[historyIndex].chapter, false); updateHistoryButtons(); }
-}
-function goHistoryForward() {
-    if (historyIndex < historyStack.length - 1) { historyIndex++; isHistoryNavigating = true; loadChapter(historyStack[historyIndex].book, historyStack[historyIndex].chapter, false); updateHistoryButtons(); }
-}
-function updateHistoryButtons() {
-    document.getElementById("hist-back-btn").style.opacity = (historyIndex <= 0) ? "0.5" : "1";
-    document.getElementById("hist-fwd-btn").style.opacity = (historyIndex >= historyStack.length - 1) ? "0.5" : "1";
-}
+
 function openBookGrid(type) {
     const modal = document.getElementById("nav-modal");
-    const title = document.getElementById("nav-modal-title");
     const grid = document.getElementById("nav-grid");
     modal.style.display = "flex";
     grid.innerHTML = "";
     let books = type === "OT" ? OT_BOOKS : NT_BOOKS;
-    title.innerText = type === "OT" ? "구약 성경 선택" : "신약 성경 선택";
+    document.getElementById("nav-modal-title").innerText = type === "OT" ? "구약 성경 선택" : "신약 성경 선택";
     books.forEach(book => {
         const btn = document.createElement("div");
         btn.className = "grid-btn";
@@ -725,12 +603,12 @@ function openBookGrid(type) {
         grid.appendChild(btn);
     });
 }
+
 function openChapterGrid(book) {
     const modal = document.getElementById("chapter-nav-modal");
-    const title = document.getElementById("chapter-modal-title");
     const grid = document.getElementById("chapter-grid");
     document.getElementById("nav-modal").style.display = "none";
-    title.innerText = `${KOREAN_BOOK_NAMES[book]} - 장 선택`;
+    document.getElementById("chapter-modal-title").innerText = `${KOREAN_BOOK_NAMES[book]} - 장 선택`;
     modal.style.display = "flex";
     grid.innerHTML = "";
     const maxChapter = BIBLE_DATA[book] || 50;
@@ -743,33 +621,18 @@ function openChapterGrid(book) {
         grid.appendChild(btn);
     }
 }
+
 function updateNavUI() {
     document.getElementById("current-location").innerText = `${KOREAN_BOOK_NAMES[currentBook]} ${currentChapter}장`;
-    const isNT = NT_BOOKS.includes(currentBook);
-    if (isNT) { document.getElementById("btn-nt").classList.add("active"); document.getElementById("btn-ot").classList.remove("active"); } 
+    if (NT_BOOKS.includes(currentBook)) { document.getElementById("btn-nt").classList.add("active"); document.getElementById("btn-ot").classList.remove("active"); } 
     else { document.getElementById("btn-ot").classList.add("active"); document.getElementById("btn-nt").classList.remove("active"); }
 }
-function renderTextWithStrongs(text, lang) {
-    if (!text) return "";
-    const parts = text.split(/(<[A-Z]{1,2}\d+>)/);
-    let html = ""; let prevWord = "";
-    for (let i = 0; i < parts.length; i++) {
-        const part = parts[i];
-        if (part.startsWith("<") && part.endsWith(">")) {
-            let code = part.replace(/[<>]/g, ""); if(code.startsWith("W")) code = code.substring(1);
-            if (prevWord.trim().length > 0) { html += `<span class="strong-word ${lang}" data-strong="${code}">${prevWord}</span>`; prevWord = ""; }
-        } else { if (prevWord) html += prevWord; prevWord = part; }
-    }
-    if (prevWord) html += prevWord;
-    return html;
-}
+
 function attachStrongClickEvents() {
     document.querySelectorAll('.strong-word').forEach(span => {
-        span.addEventListener('click', async (e) => {
+        span.addEventListener('click', (e) => {
             e.stopPropagation();
-            const code = e.target.dataset.strong;
-            const word = e.target.innerText;
-            openLexiconModal(code, word);
+            openLexiconModal(e.target.dataset.strong, e.target.innerText);
         });
     });
 }
@@ -780,22 +643,18 @@ function makeHebrewWordsClickable() {
 }
 
 async function openLexiconModal(code, word) {
-    if (window.innerWidth <= 1024) {
-        loadLexiconToLeftPanel(code, word);
-        return;
-    }
+    if (window.innerWidth <= 1024) { loadLexiconToLeftPanel(code, word); return; }
     const modal = document.getElementById("lexicon-modal");
-    const modalBody = document.getElementById("modal-body");
-    modal.style.display = "flex"; modalBody.innerHTML = `<p>사전 찾는 중: ${code}...</p>`;
-    await fetchAndRenderLexicon(code, word, modalBody);
+    modal.style.display = "flex"; 
+    document.getElementById("modal-body").innerHTML = `<p>사전 찾는 중: ${code}...</p>`;
+    await fetchAndRenderLexicon(code, word, document.getElementById("modal-body"));
 }
 
 async function loadLexiconToLeftPanel(code, word) {
     const panel = document.getElementById("lexicon-panel");
     panel.classList.add("show");
-    const contentDiv = document.getElementById("lexicon-content");
-    contentDiv.innerHTML = `<p style="padding:10px;">사전 찾는 중: ${code}...</p>`;
-    await fetchAndRenderLexicon(code, word, contentDiv);
+    document.getElementById("lexicon-content").innerHTML = `<p style="padding:10px;">사전 찾는 중: ${code}...</p>`;
+    await fetchAndRenderLexicon(code, word, document.getElementById("lexicon-content"));
 }
 
 async function fetchAndRenderLexicon(code, word, targetElement) {
@@ -803,10 +662,7 @@ async function fetchAndRenderLexicon(code, word, targetElement) {
         const res = await fetch(`${AHPI_API_BASE_URL}/lexicon/${code}`);
         const data = await res.json();
         if (data.content && data.content !== "사전 데이터가 없습니다.") {
-            let content = data.content;
-            content = content.replace(/([^\s]+)\^/g, '<span class="lexicon-huge-word">$1</span>');
-            content = content.replace(/\^/g, '');
-            targetElement.innerHTML = `<div style="text-align:left; line-height:1.6; font-size:1rem; padding:10px;">${content}</div>`;
+            targetElement.innerHTML = `<div style="text-align:left; line-height:1.6; font-size:1rem; padding:10px;">${data.content.replace(/([^\s]+)\^/g, '<span class="lexicon-huge-word">$1</span>').replace(/\^/g, '')}</div>`;
         } else {
             let link = code.startsWith('H') ? `https://biblehub.com/hebrew/${code.substring(1)}.htm` : `https://biblehub.com/greek/${code.substring(1)}.htm`;
             targetElement.innerHTML = `<p style="color:red; text-align:center; padding:10px;">사전 데이터 없음</p><div style="text-align:center; margin-top:15px;"><a href="${link}" target="_blank" style="padding:8px; background:#eee; border-radius:5px;">BibleHub에서 보기</a></div>`;
@@ -818,52 +674,32 @@ function selectVerse(verseNum) {
     currentVerse = verseNum;
     document.querySelectorAll(".verse-item").forEach(el => el.classList.remove("selected"));
     const targetRow = document.getElementById(`verse-row-${verseNum}`);
-    if (targetRow) {
-        targetRow.classList.add("selected");
-        if(verseNum === 1) targetRow.scrollIntoView({ block: "center" });
-    }
+    if (targetRow) { targetRow.classList.add("selected"); if(verseNum === 1) targetRow.scrollIntoView({ block: "center" }); }
     document.getElementById("current-verse-display").innerText = `${KOREAN_BOOK_NAMES[currentBook]||currentBook} ${currentChapter}:${verseNum}`;
 
     const commentaryDisplay = document.getElementById("commentary-display");
     commentaryDisplay.innerHTML = ''; 
 
-    const ahpiContent = loadedChapterData.ahpiCommentaries[verseNum];
-    const openContent = loadedChapterData.openCommentaries[verseNum];
     let hasContent = false;
-
-    if (ahpiContent) {
-        commentaryDisplay.appendChild(renderCommentary(verseNum, ahpiContent, 'ahpi'));
+    if (loadedChapterData.ahpiCommentaries[verseNum]) {
+        commentaryDisplay.appendChild(renderCommentary(verseNum, loadedChapterData.ahpiCommentaries[verseNum], 'ahpi'));
         hasContent = true;
     }
-
-    if (openContent) {
-        commentaryDisplay.appendChild(renderCommentary(verseNum, openContent, 'open'));
+    if (loadedChapterData.openCommentaries[verseNum]) {
+        commentaryDisplay.appendChild(renderCommentary(verseNum, loadedChapterData.openCommentaries[verseNum], 'open'));
         hasContent = true;
     }
-
-    if (!hasContent) {
-        commentaryDisplay.innerHTML = "<p style='padding:10px;'>작성된 주해가 없습니다.</p>";
-    }
+    if (!hasContent) commentaryDisplay.innerHTML = "<p style='padding:10px;'>작성된 주해가 없습니다.</p>";
     
     closeEditor();
 }
 
 function renderCommentary(verseNum, content, type) {
     const isAhpi = type === 'ahpi';
-    const title = isAhpi ? 'AHPI 공식 주해' : 'Open 주해 (회원)';
-    const className = isAhpi ? 'ahpi-commentary' : 'open-commentary';
     const color = isAhpi ? '#4a3875' : '#1f7b88'; 
-
     const container = document.createElement('div');
-    container.className = `commentary-box ${className}`;
-    container.id = `commentary-${verseNum}-${type}`;
-
-    container.innerHTML = `
-        <h4 style="color: ${color}; margin-bottom: 5px;">
-            📖 ${verseNum}절 - ${title}
-        </h4>
-        <p>${content}</p>
-    `;
+    container.className = `commentary-box ${isAhpi ? 'ahpi-commentary' : 'open-commentary'}`;
+    container.innerHTML = `<h4 style="color: ${color}; margin-bottom: 5px;">📖 ${verseNum}절 - ${isAhpi ? 'AHPI 공식 주해' : 'Open 주해 (회원)'}</h4><p>${content}</p>`;
     return container;
 }
 
@@ -879,16 +715,10 @@ async function performSearch() {
     const data = await res.json();
     if(data.results?.length) {
         body.innerHTML = `<div style='margin-bottom:10px; font-weight:bold;'>총 ${data.count}건 발견</div>` + 
-        data.results.map(item => 
-            `<div class="search-item" onclick="window.goToSearchResult('${item.book}', ${item.chapter}, ${item.verse})">
-                <div class="search-ref">${KOREAN_BOOK_NAMES[item.book] || item.book} ${item.chapter}:${item.verse}</div>
-                <div class="search-text" ${lang==='heb'?'dir="rtl"':''}>${item.text.replace(new RegExp(q, "gi"), `<mark>${q}</mark>`)}</div>
-            </div>`
-        ).join("");
+        data.results.map(item => `<div class="search-item" onclick="window.goToSearchResult('${item.book}', ${item.chapter}, ${item.verse})"><div class="search-ref">${KOREAN_BOOK_NAMES[item.book] || item.book} ${item.chapter}:${item.verse}</div><div class="search-text" ${lang==='heb'?'dir="rtl"':''}>${item.text.replace(new RegExp(q, "gi"), `<mark>${q}</mark>`)}</div></div>`).join("");
     } else body.innerHTML = "<div style='text-align:center; padding:20px;'>결과 없음</div>";
 }
 window.goToSearchResult = function(b, c, v) {
     document.getElementById("search-result-modal").style.display = "none";
     loadChapter(b, c, true);
 };
-const BOOK_INFO = KOREAN_BOOK_NAMES;
