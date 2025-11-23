@@ -413,3 +413,12 @@ body.dark-mode .ahpi-commentary {
     border: 1px dashed var(--open-comm-border);
     opacity: 0.9;
 }
+
+#bible-area {
+    /* 본문 영역에 강제로 빨간색 테두리를 쳐서 위치를 확인 */
+    border: 3px solid red !important;
+    min-width: 400px !important; 
+    display: block !important;
+    overflow: auto !important;
+}
+/* --- ---------------- --- */
