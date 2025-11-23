@@ -41,10 +41,14 @@ document.addEventListener("DOMContentLoaded", function() {
 });
 
 function setupEventListeners() {
-    document.getElementById("nav-modal-close").onclick = () => document.getElementById("nav-modal").style.display = "none";
-    document.getElementById("lexicon-close").onclick = () => document.getElementById("lexicon-modal").style.display = "none";
-    document.getElementById("search-close").onclick = () => document.getElementById("search-result-modal").style.display = "none";
-    document.getElementById("chapter-nav-close").onclick = () => document.getElementById("chapter-nav-modal").style.display = "none";
+    // 닫기 버튼들
+    const closeModal = (id) => {
+        const el = document.getElementById(id);
+        if(el) el.style.display = "none";
+    };
+    document.getElementById("nav-modal-close").onclick = () => closeModal("nav-modal");
+    document.getElementById("lexicon-close").onclick = () => closeModal("lexicon-modal");
+    document.getElementById("search-close").onclick = () => closeModal("search-result-modal");
 
     document.getElementById("btn-ot").onclick = () => openBookGrid("OT");
     document.getElementById("btn-nt").onclick = () => openBookGrid("NT");
@@ -62,8 +66,11 @@ function openBookGrid(type) {
     const modal = document.getElementById("nav-modal");
     const title = document.getElementById("nav-modal-title");
     const grid = document.getElementById("nav-grid");
+    
     modal.style.display = "flex";
     grid.innerHTML = "";
+    grid.className = "grid-container"; // 클래스 초기화
+    
     let books = type === "OT" ? OT_BOOKS : NT_BOOKS;
     title.innerText = type === "OT" ? "구약 성경 선택" : "신약 성경 선택";
 
@@ -73,31 +80,31 @@ function openBookGrid(type) {
         btn.innerText = KOREAN_BOOK_NAMES[book] || book;
         if (book === currentBook) btn.classList.add("selected");
         btn.onclick = () => {
-            currentBook = book;
-            document.getElementById("nav-modal").style.display = "none";
-            updateNavUI();
-            openChapterModal();
+            openChapterGrid(book);
         };
         grid.appendChild(btn);
     });
 }
 
-function openChapterModal() {
-    const modal = document.getElementById("chapter-nav-modal");
-    const title = document.getElementById("chapter-modal-title");
-    const grid = document.getElementById("chapter-grid");
-    title.innerText = `${KOREAN_BOOK_NAMES[currentBook]} - 장 선택`;
-    modal.style.display = "flex";
+function openChapterGrid(book) {
+    const title = document.getElementById("nav-modal-title");
+    const grid = document.getElementById("nav-grid");
+    
+    title.innerText = `${KOREAN_BOOK_NAMES[book]} - 장 선택`;
     grid.innerHTML = "";
-    const maxChapter = BIBLE_DATA[currentBook] || 50;
+    grid.className = "grid-container number-grid"; // 숫자판 스타일 적용
+
+    const maxChapter = BIBLE_DATA[book] || 50;
+
     for (let i = 1; i <= maxChapter; i++) {
         const btn = document.createElement("div");
         btn.className = "grid-btn chapter-num";
         btn.innerText = i;
-        if (i === currentChapter) btn.classList.add("selected");
+        if (book === currentBook && i === currentChapter) btn.classList.add("selected");
         btn.onclick = () => {
+            currentBook = book;
             currentChapter = i;
-            document.getElementById("chapter-nav-modal").style.display = "none";
+            document.getElementById("nav-modal").style.display = "none";
             fetchChapter(currentBook, currentChapter);
         };
         grid.appendChild(btn);
@@ -108,7 +115,6 @@ function updateNavUI() {
     document.getElementById("current-location").innerText = `${KOREAN_BOOK_NAMES[currentBook]} ${currentChapter}장`;
 }
 
-// --- 데이터 로드 ---
 async function fetchChapter(book, chapter) {
     currentBook = book;
     currentChapter = chapter;
@@ -123,6 +129,7 @@ async function fetchChapter(book, chapter) {
     try {
         const res = await fetch(url);
         if(!res.ok) throw new Error("서버 응답 실패");
+        
         const ahpiData = await res.json();
         
         loadedChapterData.korean = ahpiData.korean_verses || {};
@@ -146,9 +153,10 @@ async function fetchChapter(book, chapter) {
 
         renderBibleList(maxVerse);
         selectVerse(1);
+
     } catch (error) {
         console.error(error);
-        bibleList.innerHTML = "<p style='color:red'>데이터 로드 실패</p>";
+        bibleList.innerHTML = "<p style='color:red'>데이터 로드 실패 (서버가 켜져 있나요?)</p>";
     }
 }
 
@@ -167,59 +175,52 @@ function renderBibleList(maxVerse) {
         div.id = `verse-row-${i}`; 
         div.onclick = () => selectVerse(i); 
 
-        const rawKor = loadedChapterData.korean[i] || "";
-        
-        let eng = "";
-        if (Array.isArray(loadedChapterData.english)) {
-            eng = loadedChapterData.english[i-1] || "";
-        } else {
-            eng = loadedChapterData.english[i] || "";
-        }
-        const engHtml = renderEnglishWithStrongs(eng);
-
-        // [핵심] 원어 본문 처리
+        const kor = loadedChapterData.korean[i] || "";
+        const eng = Array.isArray(loadedChapterData.english) ? (loadedChapterData.english[i-1] || "") : (loadedChapterData.english[i] || "");
         const ori = loadedChapterData.original[i-1] || "";
-        // 원어도 스트롱 코드(<WH1234> 등)가 있다면 파싱해서 링크를 걸어줌
-        // (현재 원본 파일에는 WH 코드가 없을 수도 있음. 일단 영어/한글처럼 처리)
-        // 만약 원어 데이터에도 <WH...>가 있다면 아래 코드가 작동함.
-        // 없다면 그냥 텍스트만 출력됨.
-        let oriHtml = renderTextWithStrongs(ori, "original"); 
+
+        // 텍스트 파싱
+        const korHtml = renderTextWithStrongs(kor, "kor");
+        const engHtml = renderTextWithStrongs(eng, "eng");
 
         let html = `<span class="verse-num">${i}.</span>`;
-        // [핵심] 한글도 스트롱 코드 파싱 적용
-        html += `<span class="korean-text">${renderTextWithStrongs(rawKor, "kor")}</span>`;
+        html += `<span class="korean-text">${korHtml}</span>`;
         html += `<span class="english-text">${engHtml}</span>`; 
-        html += `<span class="hebrew-text">${oriHtml}</span>`; 
+        
+        // 원어 처리
+        const oriWords = ori.split(/\s+/).filter(w => w.length > 0);
+        let oriHtml = "";
+        oriWords.forEach(word => {
+            if (/[\u0590-\u05FF]/.test(word) || /[\u0370-\u03FF\u1F00-\u1FFF]/.test(word)) {
+                const cleanData = word.replace(/['".,;:]/g, '');
+                oriHtml += `<span class="hebrew-word" data-word="${cleanData}">${word}</span> `;
+            } else {
+                oriHtml += `${word} `;
+            }
+        });
+        html += `<span class="hebrew-text">${oriHtml}</span>`;
 
         div.innerHTML = html;
         list.appendChild(div);
     }
     
-    // 이벤트 연결 (스트롱 코드 클릭)
     attachStrongClickEvents();
+    makeHebrewWordsClickable();
 }
 
-// --- [핵심] 스트롱 코드 파싱 (한글/영어 공용) ---
 function renderTextWithStrongs(text, lang) {
     if (!text) return "";
-    
-    // 정규식: <WH1234>, <H1234>, <G1234> 등 찾기
-    // WH, WG, H, G 모두 처리
     const parts = text.split(/(<[A-Z]{1,2}\d+>)/);
     let html = "";
     let prevWord = "";
 
     for (let i = 0; i < parts.length; i++) {
         const part = parts[i];
-        // 태그 발견!
         if (part.startsWith("<") && part.endsWith(">")) {
-            // <WH7225> -> H7225 (W 제거, H/G 남김)
-            // <G1234> -> G1234
             let code = part.replace(/[<>]/g, ""); 
-            if(code.startsWith("W")) code = code.substring(1); // WH -> H
+            if(code.startsWith("W")) code = code.substring(1);
 
             if (prevWord.trim().length > 0) {
-                // 직전 단어에 링크 걸기
                 html += `<span class="strong-word ${lang}" data-strong="${code}">${prevWord}</span>`;
                 prevWord = "";
             }
@@ -232,7 +233,6 @@ function renderTextWithStrongs(text, lang) {
     return html;
 }
 
-// --- [핵심] 사전 팝업 (우리 서버 호출) ---
 function attachStrongClickEvents() {
     document.querySelectorAll('.strong-word').forEach(span => {
         span.addEventListener('click', async (e) => {
@@ -268,7 +268,16 @@ function attachStrongClickEvents() {
     });
 }
 
-// --- 기타 함수들 ---
+function makeHebrewWordsClickable() {
+    document.querySelectorAll('.hebrew-word').forEach(span => {
+        span.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const w = e.target.dataset.word;
+            alert(`원어 단어: ${w}\n(원어 본문에는 스트롱 코드가 없어서 사전 연결이 어렵습니다.)`);
+        });
+    });
+}
+
 function selectVerse(verseNum) {
     currentVerse = verseNum;
     document.querySelectorAll(".verse-item").forEach(el => el.classList.remove("selected"));
