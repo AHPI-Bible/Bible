@@ -1,3 +1,4 @@
+// Render 서버 주소
 const AHPI_API_BASE_URL = "https://ahpi-bible-backend.onrender.com/api";
 
 const BIBLE_DATA = {
@@ -40,64 +41,47 @@ document.addEventListener("DOMContentLoaded", function() {
 
 function setupEventListeners() {
     // 닫기 버튼들
+    document.getElementById("nav-modal-close").onclick = () => document.getElementById("nav-modal").style.display = "none";
     document.getElementById("lexicon-close").onclick = () => document.getElementById("lexicon-modal").style.display = "none";
     document.getElementById("search-close").onclick = () => document.getElementById("search-result-modal").style.display = "none";
-    document.getElementById("book-nav-close").onclick = () => document.getElementById("book-nav-modal").style.display = "none";
-    document.getElementById("chapter-nav-close").onclick = () => document.getElementById("chapter-nav-modal").style.display = "none";
 
-    // 내비게이션 버튼
+    // [핵심] 구약/신약 버튼 클릭 시 팝업 열기
+    document.getElementById("btn-ot").onclick = () => openBookGrid("OT");
+    document.getElementById("btn-nt").onclick = () => openBookGrid("NT");
+
+    // 이전/다음 버튼
     document.getElementById("prev-btn").onclick = goToPrevChapter;
     document.getElementById("next-btn").onclick = goToNextChapter;
-    document.getElementById("go-btn").onclick = navigateManual; // (이젠 거의 안쓰지만 유지)
-    
+
+    // 검색
     document.getElementById("search-btn").onclick = performSearch;
     document.getElementById("search-input").onkeypress = (e) => { if(e.key === 'Enter') performSearch(); };
 
-    // [NEW] 트리거 버튼 (책 선택 / 장 선택)
-    document.getElementById("book-trigger").onclick = () => openBookModal();
-    document.getElementById("chapter-trigger").onclick = () => openChapterModal();
-
-    // [NEW] 구약/신약 탭 버튼
-    document.getElementById("tab-ot").onclick = () => renderBookGrid("OT");
-    document.getElementById("tab-nt").onclick = () => renderBookGrid("NT");
-
-    // 에디터
+    // 에디터 버튼
     document.getElementById("edit-btn").onclick = openEditor;
     document.getElementById("cancel-btn").onclick = closeEditor;
     document.getElementById("save-btn").onclick = saveCommentary;
 }
 
-// --- [UI] 책 선택 팝업 ---
-function openBookModal() {
-    const modal = document.getElementById("book-nav-modal");
-    modal.style.display = "flex";
-    // 현재 책이 구약이면 구약 탭, 신약이면 신약 탭 열기
-    if (NT_BOOKS.includes(currentBook)) {
-        renderBookGrid("NT");
-    } else {
-        renderBookGrid("OT");
-    }
-}
-
-function renderBookGrid(type) {
-    const grid = document.getElementById("book-grid");
-    const tabOt = document.getElementById("tab-ot");
-    const tabNt = document.getElementById("tab-nt");
+// --- [1단계] 책 목록 보여주기 (구약 or 신약) ---
+function openBookGrid(type) {
+    const modal = document.getElementById("nav-modal");
+    const title = document.getElementById("nav-modal-title");
+    const grid = document.getElementById("nav-grid");
     
+    modal.style.display = "flex";
     grid.innerHTML = "";
     
-    // 탭 활성화 스타일
+    let books = [];
     if (type === "OT") {
-        tabOt.classList.add("active");
-        tabNt.classList.remove("active");
+        title.innerText = "구약 성경 선택";
         books = OT_BOOKS;
     } else {
-        tabNt.classList.add("active");
-        tabOt.classList.remove("active");
+        title.innerText = "신약 성경 선택";
         books = NT_BOOKS;
     }
 
-    // 버튼 생성
+    // 책 버튼 생성
     books.forEach(book => {
         const btn = document.createElement("div");
         btn.className = "grid-btn";
@@ -105,56 +89,43 @@ function renderBookGrid(type) {
         if (book === currentBook) btn.classList.add("selected");
         
         btn.onclick = () => {
-            // 책 선택 -> 바로 장 선택 팝업으로 이동
-            currentBook = book;
-            document.getElementById("book-nav-modal").style.display = "none";
-            updateNavUI(); // 버튼 글자 업데이트
-            openChapterModal(); // 장 선택 열기
+            // 책을 선택하면 -> 장 선택 화면으로 전환
+            openChapterGrid(book);
         };
         grid.appendChild(btn);
     });
 }
 
-// --- [UI] 장 선택 팝업 ---
-function openChapterModal() {
-    const modal = document.getElementById("chapter-nav-modal");
-    const title = document.getElementById("chapter-modal-title");
-    const grid = document.getElementById("chapter-grid");
+// --- [2단계] 장(Chapter) 목록 보여주기 ---
+function openChapterGrid(book) {
+    const title = document.getElementById("nav-modal-title");
+    const grid = document.getElementById("nav-grid");
     
-    title.innerText = `${KOREAN_BOOK_NAMES[currentBook]} - 장 선택`;
-    modal.style.display = "flex";
-    grid.innerHTML = "";
+    title.innerText = `${KOREAN_BOOK_NAMES[book]} - 장 선택`;
+    grid.innerHTML = ""; // 기존 책 목록 지움
 
-    const maxChapter = BIBLE_DATA[currentBook] || 50;
+    const maxChapter = BIBLE_DATA[book] || 50;
 
     for (let i = 1; i <= maxChapter; i++) {
         const btn = document.createElement("div");
-        btn.className = "grid-btn";
+        btn.className = "grid-btn chapter-num"; // 숫자 스타일
         btn.innerText = i;
-        if (i === currentChapter) btn.classList.add("selected");
         
         btn.onclick = () => {
-            // 장 선택 -> 데이터 로드
-            currentChapter = i;
-            document.getElementById("chapter-nav-modal").style.display = "none";
-            fetchChapter(currentBook, currentChapter);
+            // 장을 선택하면 -> 팝업 닫고 데이터 로드
+            document.getElementById("nav-modal").style.display = "none";
+            fetchChapter(book, i);
         };
         grid.appendChild(btn);
     }
 }
 
-// --- [UI] 버튼 텍스트 업데이트 ---
+// --- 텍스트 업데이트 ---
 function updateNavUI() {
-    document.getElementById("book-trigger").innerText = `${KOREAN_BOOK_NAMES[currentBook]} ▾`;
-    document.getElementById("chapter-trigger").innerText = `${currentChapter}장 ▾`;
+    document.getElementById("current-location").innerText = `${KOREAN_BOOK_NAMES[currentBook]} ${currentChapter}장`;
 }
 
-// ... (이하 기존 fetchChapter, renderBibleList 등 데이터 로직은 100% 동일) ...
-// 아래는 기존 코드에서 navigateManual만 수정하고 나머지는 유지
-
-function navigateManual() {
-    fetchChapter(currentBook, currentChapter); // 그냥 새로고침 역할
-}
+// --- (이하 데이터 로드 및 나머지 로직은 기존과 동일하지만, 일부 최적화) ---
 
 async function fetchChapter(book, chapter) {
     currentBook = book;
@@ -170,7 +141,6 @@ async function fetchChapter(book, chapter) {
     try {
         const res = await fetch(url);
         if(!res.ok) throw new Error("서버 응답 실패");
-        
         const ahpiData = await res.json();
         
         loadedChapterData.korean = ahpiData.korean_verses || {};
@@ -194,7 +164,7 @@ async function fetchChapter(book, chapter) {
 
     } catch (error) {
         console.error(error);
-        bibleList.innerHTML = "<p style='color:red'>데이터를 가져오지 못했습니다.</p>";
+        bibleList.innerHTML = "<p style='color:red'>데이터 로드 실패</p>";
     }
 }
 
@@ -214,6 +184,7 @@ function renderBibleList(maxVerse) {
         div.onclick = () => selectVerse(i); 
 
         const kor = loadedChapterData.korean[i] || "";
+        
         let eng = "";
         if (Array.isArray(loadedChapterData.english)) {
             eng = loadedChapterData.english[i-1] || "";
@@ -247,16 +218,15 @@ function renderBibleList(maxVerse) {
     makeEnglishWordsClickable(); 
 }
 
+// --- 영어 스트롱 코드 파싱 ---
 function renderEnglishWithStrongs(text) {
     if (!text) return "";
     const parts = text.split(/\s+/);
     let resultHtml = "";
     let currentWord = "";
-    
     for (let i = 0; i < parts.length; i++) {
         const part = parts[i];
         const match = part.match(/[<{]([HG]\d+)[>}]/);
-        
         if (match) {
             const strongCode = match[1]; 
             if (currentWord) {
@@ -271,7 +241,6 @@ function renderEnglishWithStrongs(text) {
     if (currentWord) resultHtml += `${currentWord}`;
     return resultHtml;
 }
-
 function makeEnglishWordsClickable() {
     document.querySelectorAll('.eng-strong-word').forEach(span => {
         span.addEventListener('click', handleEnglishClick);
@@ -280,16 +249,13 @@ function makeEnglishWordsClickable() {
         span.style.textDecorationColor = "#ccc";
     });
 }
-
 async function handleEnglishClick(event) {
     const strongCode = event.target.dataset.strong; 
     const word = event.target.innerText;
-    
     const modal = document.getElementById("lexicon-modal");
     const modalBody = document.getElementById("modal-body");
     modal.style.display = "flex"; 
     modalBody.innerHTML = `<p>검색 중: ${strongCode}...</p>`;
-
     let html = `<h3 style="font-size:1.8rem; color:#007bff;">${word} (${strongCode})</h3>`;
     let link = "";
     if (strongCode.startsWith("H")) { 
@@ -301,34 +267,25 @@ async function handleEnglishClick(event) {
         link = `https://biblehub.com/greek/${num}.htm`;
         html += `<p>헬라어 사전으로 연결됩니다.</p>`;
     }
-    
-    html += `<div style="margin-top:20px;">
-                <a href="${link}" target="_blank" 
-                   style="padding:12px; background:#f1f3f5; border-radius:8px; text-decoration:none; color:#333; font-weight:bold; border:1px solid #ddd; display:block; text-align:center;">
-                   📘 BibleHub 사전 보기 ↗
-                </a>
-             </div>`;
+    html += `<div style="margin-top:20px;"><a href="${link}" target="_blank" style="padding:12px; background:#f1f3f5; border-radius:8px; text-decoration:none; color:#333; font-weight:bold; border:1px solid #ddd; display:block; text-align:center;">📘 BibleHub 사전 보기 ↗</a></div>`;
     modalBody.innerHTML = html;
 }
 
+// --- 원어 단어 클릭 ---
 function makeHebrewWordsClickable() {
     document.querySelectorAll('.hebrew-word').forEach(span => {
         span.addEventListener('click', handleWordClick);
     });
 }
-
 async function handleWordClick(event) {
     const rawWord = event.target.dataset.word;
     const modal = document.getElementById("lexicon-modal");
     const modalBody = document.getElementById("modal-body");
     modal.style.display = "flex"; 
     modalBody.innerHTML = `<p>검색 중: ${rawWord}</p>`;
-
     const isHebrew = /[\u0590-\u05FF]/.test(rawWord);
     const cleanWord = isHebrew ? rawWord.replace(/[\u0591-\u05C7]/g, '') : rawWord.replace(/[.,;·]/g, '');
-
     let html = `<h3 style="font-size:1.8rem; text-align:center; color:#007bff;">${rawWord}</h3>`;
-    
     html += `<div style="display:flex; gap:10px; justify-content:center; margin-bottom:20px;">`;
     if (isHebrew) {
         html += `<a href="https://dict.naver.com/heko/#/search?query=${cleanWord}" target="_blank" style="padding:8px 15px; background:#03C75A; color:white; border-radius:5px; text-decoration:none;">네이버 히브리어</a>`;
@@ -338,7 +295,6 @@ async function handleWordClick(event) {
         html += `<a href="https://biblehub.com/greek/${cleanWord}.htm" target="_blank" style="padding:8px 15px; background:#004085; color:white; border-radius:5px; text-decoration:none;">Bible Hub</a>`;
     }
     html += `</div>`;
-
     if (isHebrew) {
         try {
             const res = await fetch(`https://www.sefaria.org/api/words/${cleanWord}`);
@@ -373,7 +329,6 @@ function selectVerse(verseNum) {
     document.getElementById("commentary-display").innerText = comment ? comment : "작성된 주해가 없습니다.";
     closeEditor();
 }
-
 function openEditor() {
     const displayDiv = document.getElementById("commentary-display");
     const input = document.getElementById("commentary-input");

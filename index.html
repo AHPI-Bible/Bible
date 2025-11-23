@@ -16,20 +16,18 @@
     </header>
 
     <div class="nav-container">
-        <button id="prev-btn" class="nav-btn">◀ 이전 장</button>
-        
-        <div class="nav-inputs">
-            <button id="book-trigger" class="nav-trigger">창세기 ▾</button>
-            <button id="chapter-trigger" class="nav-trigger">1장 ▾</button>
-            <button id="go-btn" class="go-btn">이동</button>
+        <div class="nav-left">
+            <button id="prev-btn" class="nav-btn">◀</button>
+            <button id="btn-ot" class="nav-trigger">구약 선택</button>
+            <button id="btn-nt" class="nav-trigger">신약 선택</button>
+            <span id="current-location" class="location-text">창세기 1장</span>
+            <button id="next-btn" class="nav-btn">▶</button>
         </div>
 
         <div class="search-box">
             <input type="text" id="search-input" placeholder="단어 검색...">
             <button id="search-btn" class="nav-btn">🔍</button>
         </div>
-
-        <button id="next-btn" class="nav-btn">다음 장 ▶</button>
     </div>
 
     <main class="container">
@@ -54,6 +52,14 @@
         </aside>
     </main>
 
+    <div id="nav-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content large-modal">
+            <span id="nav-modal-close" class="close-btn">&times;</span>
+            <h2 id="nav-modal-title">성경 선택</h2>
+            <div id="nav-grid" class="grid-container"></div>
+        </div>
+    </div>
+
     <div id="lexicon-modal" class="modal-overlay" style="display: none;">
         <div class="modal-content">
             <span id="lexicon-close" class="close-btn">&times;</span>
@@ -67,31 +73,6 @@
             <span id="search-close" class="close-btn">&times;</span>
             <h2>검색 결과</h2>
             <div id="search-results-body"></div>
-        </div>
-    </div>
-
-    <div id="book-nav-modal" class="modal-overlay" style="display: none;">
-        <div class="modal-content large-modal">
-            <span id="book-nav-close" class="close-btn">&times;</span>
-            <h2>성경 선택</h2>
-            
-            <div class="tab-container">
-                <button class="tab-btn active" id="tab-ot">구약</button>
-                <button class="tab-btn" id="tab-nt">신약</button>
-            </div>
-
-            <div id="book-grid" class="grid-container">
-                </div>
-        </div>
-    </div>
-
-    <div id="chapter-nav-modal" class="modal-overlay" style="display: none;">
-        <div class="modal-content">
-            <span id="chapter-nav-close" class="close-btn">&times;</span>
-            <h2 id="chapter-modal-title">장 선택</h2>
-            
-            <div id="chapter-grid" class="grid-container number-grid">
-                </div>
         </div>
     </div>
 
