@@ -17,12 +17,9 @@ greek_map = {}
 hebrew_map = {}          
 lexicon_map = {}         
 
-# 검색용 인덱스 (언어별 분리)
+# 검색용 인덱스
 search_index = {
-    'kor': [],
-    'eng': [],
-    'heb': [],
-    'grk': []
+    'kor': [], 'eng': [], 'heb': [], 'grk': []
 }
 
 base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -34,25 +31,31 @@ def load_csv_to_map(filename, target_map, lang_code=None, is_lexicon=False):
         return
     
     try:
-        # [수정] 헤더 유무를 파악하여 1절 누락 방지
+        # [핵심 수정] 1절이 안 보이는 문제 해결을 위한 강력한 헤더 감지 로직
         with open(path, 'r', encoding='utf-8-sig') as f:
-            # 첫 줄을 살짝 읽어서 헤더인지 데이터인지 확인
-            sample_line = f.readline()
-            f.seek(0) # 파일 포인터를 다시 처음으로 돌림
+            # 첫 줄을 읽어서 확인
+            first_line = f.readline().strip()
+            f.seek(0) # 다시 처음으로 되돌림
+
+            # 첫 줄에 'book'이나 'chapter' 같은 단어가 있으면 헤더가 있는 것
+            # 없으면(즉, Genesis, Matthew 등으로 시작하면) 데이터로 간주
+            has_header = any(keyword in first_line.lower() for keyword in ['book', 'chapter', 'verse', 'text', 'strong_code', 'content'])
             
-            # 헤더가 있는지 확인 (book, chapter, verse 등의 단어가 포함되어 있는지)
-            has_header = any(keyword in sample_line.lower() for keyword in ['book', 'chapter', 'verse', 'text', 'strong_code', 'content'])
-            
+            # 예외: 만약 첫 줄이 'Genesis'나 'Matthew' 등으로 시작하면 무조건 헤더 없음으로 처리
+            if "genesis" in first_line.lower() or "matthew" in first_line.lower() or "창세기" in first_line:
+                has_header = False
+
             reader = None
             if has_header:
                 reader = csv.DictReader(f)
             else:
-                # 헤더가 없으면 컬럼명 강제 지정
+                # 헤더가 없으면 우리가 직접 컬럼명을 부여해서 1절부터 읽게 함
                 if is_lexicon:
                     reader = csv.DictReader(f, fieldnames=['strong_code', 'content'])
                 else:
                     reader = csv.DictReader(f, fieldnames=['book', 'chapter', 'verse', 'text'])
 
+            # 공백 제거
             if reader.fieldnames:
                 reader.fieldnames = [name.strip() for name in reader.fieldnames]
 
@@ -84,28 +87,24 @@ def load_csv_to_map(filename, target_map, lang_code=None, is_lexicon=False):
                     except ValueError:
                         continue
                         
-        print(f"✅ {filename} 로드 완료: {count}건 (헤더 감지: {'있음' if has_header else '없음 -> 강제 지정'})")
+        print(f"✅ {filename} 로드 완료: {count}건 (헤더: {'있음' if has_header else '없음 -> 1절 강제 로드'})")
     except Exception as e:
         print(f"❌ {filename} 로드 실패: {e}")
 
-# 파일 로드
+# 파일 로드 실행
 load_csv_to_map('korean_bible.csv', korean_map, lang_code='kor')
 load_csv_to_map('english_bible.csv', english_map, lang_code='eng')
 load_csv_to_map('greek_bible.csv', greek_map, lang_code='grk')
 load_csv_to_map('hebrew_bible.csv', hebrew_map, lang_code='heb')
 load_csv_to_map('strong_lexicon.csv', lexicon_map, is_lexicon=True)
 
-# DB 연결
+# DB 연결 (주석 처리 또는 환경변수 사용)
 def get_db_connection():
-    # 로컬 테스트 시 주석 처리하거나 로컬 DB 정보 입력 필요
-    # 배포 시에는 os.environ['DATABASE_URL'] 사용
     if 'DATABASE_URL' in os.environ:
         conn = psycopg2.connect(os.environ['DATABASE_URL'])
-    else:
-        # 로컬 폴더에 commentaries.db (SQLite)를 쓰거나, 로컬 Postgres 연결
-        # 여기서는 에러 방지를 위해 None 리턴 혹은 예외 처리
-        raise Exception("DATABASE_URL 환경변수가 설정되지 않았습니다.")
-    return conn
+        return conn
+    # 로컬 테스트용 (없으면 에러)
+    raise Exception("DATABASE_URL 환경변수가 설정되지 않았습니다.")
 
 def init_db():
     try:
@@ -126,31 +125,41 @@ def init_db():
         conn.close()
         print("DB 초기화 완료")
     except Exception as e:
-        print(f"DB 초기화 실패 (로컬 테스트 중이면 무시 가능): {e}")
+        print(f"DB 초기화 실패 (로컬 테스트 중이면 무시): {e}")
 
 with app.app_context():
     init_db()
 
-# [NEW] 원전분해.sdb 연결 함수
+# [수정됨] 원전분해 DB 연결 및 테이블 확인 로직 추가
 def get_analysis_from_sdb(book, chapter, verse):
     sdb_path = os.path.join(base_dir, '원전분해.sdb')
     
     if not os.path.exists(sdb_path):
-        return {"error": "원전분해.sdb 파일이 서버 폴더에 없습니다."}
+        return {"error": "원전분해.sdb 파일이 없습니다."}
 
     try:
         conn = sqlite3.connect(sdb_path)
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
 
-        # [주의] sdb 파일 내 테이블 이름이 'words'가 아니라면 수정해야 함
-        query = """
+        # 1. 테이블 이름 확인 (디버깅용)
+        cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        tables = [row['name'] for row in cur.fetchall()]
+        
+        # 2. 'words' 테이블이 있는지 확인
+        target_table = 'words'
+        if target_table not in tables:
+            # words가 없으면, 혹시 다른 이름이 있는지 확인해서 에러 메시지로 알려줌
+            conn.close()
+            return {"error": f"DB 오류: 'words' 테이블이 없습니다. 발견된 테이블 목록: {tables}"}
+
+        # 3. 쿼리 실행 (테이블 이름이 맞다면)
+        query = f"""
             SELECT original_word, pronunciation, strong_code, grammar_desc, meaning
-            FROM words
+            FROM {target_table}
             WHERE book = ? AND chapter = ? AND verse = ?
             ORDER BY word_order
         """
-        # book 이름 매핑이 필요하면 여기서 처리 (현재는 그대로 전달)
         cur.execute(query, (book, chapter, verse))
         rows = cur.fetchall()
         
@@ -189,17 +198,14 @@ def get_ahpi_chapter_data(book_name, chapter_num):
     try:
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute(
-            "SELECT verse, content FROM commentaries WHERE book = %s AND chapter = %s",
-            (book_name, chapter_num)
-        )
+        cur.execute("SELECT verse, content FROM commentaries WHERE book = %s AND chapter = %s", (book_name, chapter_num))
         rows = cur.fetchall()
         for row in rows:
             commentaries[row[0]] = row[1]
         cur.close()
         conn.close()
-    except Exception as e:
-        print(f"DB 오류 (주석 로드 실패): {e}")
+    except:
+        pass
 
     return jsonify({
         'korean_verses': korean_verses,
@@ -215,7 +221,6 @@ def get_lexicon(code):
         return jsonify({"code": code, "content": lexicon_map[code]})
     return jsonify({"code": code, "content": "사전 데이터가 없습니다."})
 
-# [NEW] 원전 분해 API
 @app.route('/api/analysis/<book>/<int:chapter>/<int:verse>', methods=['GET'])
 def get_verse_analysis(book, chapter, verse):
     data = get_analysis_from_sdb(book, chapter, verse)

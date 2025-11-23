@@ -1,6 +1,6 @@
-// Render 서버 주소 (배포 시 사용)
+// Render 서버 주소 (배포 시 주석 해제)
 const AHPI_API_BASE_URL = "https://ahpi-bible-backend.onrender.com/api";
-// 로컬 테스트 시 아래 주석 해제 후 사용
+// 로컬 테스트용
 // const AHPI_API_BASE_URL = "http://127.0.0.1:5000/api";
 
 const BIBLE_DATA = {
@@ -154,7 +154,6 @@ async function fetchChapterData(book, chapter) {
     }
 }
 
-// [핵심 변경] 리스트 렌더링 수정 (3가지 아이콘 배치)
 function renderBibleList(maxVerse) {
     const list = document.getElementById("bible-list");
     list.innerHTML = "";
@@ -168,7 +167,6 @@ function renderBibleList(maxVerse) {
         div.className = "verse-item";
         div.id = `verse-row-${i}`; 
         
-        // 배경 클릭 시: 선택만 함 (주해창 안 열림)
         div.onclick = (e) => {
             if(e.target.closest('.left-column') || e.target.closest('.strong-word') || e.target.closest('.hebrew-word')) return;
             selectVerse(i);
@@ -179,27 +177,22 @@ function renderBibleList(maxVerse) {
         const ori = loadedChapterData.original[i-1] || "";
         const commentContent = loadedChapterData.commentaries[i];
         
-        // 주해 내용 유무에 따른 클래스 지정
         const commIconClass = commentContent ? "material-icons left-icon-btn comm-icon has-content" : "material-icons left-icon-btn comm-icon";
 
         const korHtml = renderTextWithStrongs(korRaw, "kor");
         const engHtml = renderTextWithStrongs(engRaw, "eng");
 
-        // [구조 변경] 좌측 열에 아이콘 3개 세로 배치
         let html = `
             <div class="left-column">
                 <div class="verse-num">${i}.</div>
-                
                 <div class="left-icon-btn analysis-icon" title="원전 분해" 
                      onclick="openAnalysisModal('${currentBook}', ${currentChapter}, ${i})">
                      ${analysisIcon}
                 </div>
-                
                 <div class="${commIconClass}" title="주해 보기" 
                      onclick="handleCommentaryClick(${i})">
                      article
                 </div>
-                
                 <div class="material-icons left-icon-btn copy-icon-left" title="복사" 
                      onclick="openCopyModal('${korRaw.replace(/'/g, "\\'")}', '${engRaw.replace(/'/g, "\\'")}', '${ori.replace(/'/g, "\\'")}', ${i})">
                      content_copy
@@ -226,16 +219,14 @@ function renderBibleList(maxVerse) {
     makeHebrewWordsClickable();
 }
 
-// 주해 아이콘 클릭 핸들러
 function handleCommentaryClick(verseNum) {
     selectVerse(verseNum); 
-    // 모바일이면 주해창 강제 열기
     if (window.innerWidth <= 768) {
         document.getElementById("commentary-area").classList.add("show");
     }
 }
 
-// [NEW] 원전 분해 모달 열기 및 데이터 로드
+// [수정됨] 원전 분해 모달 (에러 시 테이블 목록 표시)
 async function openAnalysisModal(book, chapter, verse) {
     const modal = document.getElementById("analysis-modal");
     const body = document.getElementById("analysis-body");
@@ -248,7 +239,11 @@ async function openAnalysisModal(book, chapter, verse) {
         const data = await res.json();
 
         if (data.error) {
-            body.innerHTML = `<p style="color:red;">오류: ${data.error}</p><p style="font-size:0.8rem; color:#666;">(api.py에서 테이블 이름을 확인하세요)</p>`;
+            // [중요] 에러 메시지에 테이블 목록이 포함되어 있으므로 그대로 보여줌
+            body.innerHTML = `<p style="color:red; font-weight:bold;">${data.error}</p>
+                              <p style="color:#666; margin-top:10px; font-size:0.9rem;">
+                                위 목록에 있는 테이블 이름으로 api.py의 SQL 쿼리를 수정해야 합니다.
+                              </p>`;
             return;
         }
 
@@ -371,12 +366,6 @@ function updateNavUI() {
     if (isNT) { document.getElementById("btn-nt").classList.add("active"); document.getElementById("btn-ot").classList.remove("active"); } 
     else { document.getElementById("btn-ot").classList.add("active"); document.getElementById("btn-nt").classList.remove("active"); }
 }
-function openAnalysisModalDummy(text) {
-    const modal = document.getElementById("analysis-modal");
-    const body = document.getElementById("analysis-body");
-    modal.style.display = "flex";
-    body.innerHTML = `<h3 dir="rtl" style="font-size:1.5rem;">${text}</h3><p>원전 분해 기능은 준비 중입니다.</p>`;
-}
 function renderTextWithStrongs(text, lang) {
     if (!text) return "";
     const parts = text.split(/(<[A-Z]{1,2}\d+>)/);
@@ -455,7 +444,6 @@ async function saveCommentary() {
     loadedChapterData.commentaries[currentVerse] = content;
     selectVerse(currentVerse);
     
-    // 주해 저장 후 아이콘 상태 업데이트
     const row = document.getElementById(`verse-row-${currentVerse}`);
     if (row) {
         const icon = row.querySelector('.comm-icon');
