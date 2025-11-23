@@ -103,7 +103,6 @@ function setupEventListeners() {
     document.getElementById("btn-comm-font-minus").onclick = () => changeCommFontSize(-10);
 
     document.getElementById("close-analysis-btn").onclick = closeAnalysisPanel;
-    // [FIX] Lexicon Panel 닫기 버튼을 깔끔하게 연결
     document.getElementById("close-lexicon-btn").onclick = closeLexiconPanel;
     document.getElementById("close-commentary-btn").onclick = () => {
         if(window.innerWidth <= 768) toggleCommentary();
@@ -147,7 +146,6 @@ function setupEventListeners() {
 
 // --- [Utility Functions - Text and Navigation] ---
 
-// [FIXED] ReferenceError (goToPrevChapter/NextChapter, history functions were previously missing or misplaced)
 function goToNextChapter() {
     if(currentChapter < BIBLE_DATA[currentBook]) loadChapter(currentBook, currentChapter + 1, true);
     else {
@@ -183,7 +181,6 @@ function updateHistoryButtons() {
 
 /**
  * 텍스트 내 스트롱 코드를 찾아 span 태그로 감싸주는 함수
- * [FIXED] Missing function restored
  */
 function renderTextWithStrongs(text, lang) {
     if (!text) return "";
@@ -203,7 +200,6 @@ function renderTextWithStrongs(text, lang) {
 
 /**
  * 원어 텍스트를 클릭 가능한 단어로 분리하는 함수
- * [FIXED] Missing function restored
  */
 function renderOriginalText(text) {
     const words = text.split(/\s+/).filter(w => w.length > 0);
@@ -218,6 +214,7 @@ function renderOriginalText(text) {
     });
     return html;
 }
+
 
 // --- [Authorization and Authentication Logic] ---
 
@@ -352,6 +349,8 @@ async function saveCommentary() {
     btn.innerText = "저장";
     closeEditor();
 }
+
+// --- [Rendering and Layout Utilities] ---
 
 function applyLayout(className) {
     layoutClasses.forEach(c => document.body.classList.remove(c));
