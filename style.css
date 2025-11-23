@@ -95,11 +95,27 @@ h1 { margin: 0; font-size: 1.5rem; line-height: 1.2; }
 #bible-area { 
     flex: 1; background: var(--card-bg); display: flex; flex-direction: column; border-right: 1px solid var(--border-color); 
     overflow-y: auto; 
-    /* [중요] 모바일에서 1절이 헤더에 가리지 않도록 상단 패딩 추가 */
-    padding-top: 10px; 
-    scroll-padding-top: 50px; 
+    /* [중요] 1절 가림 방지 여백 */
+    padding-top: 20px; 
+    scroll-padding-top: 60px; 
 }
 
+/* 좌측 원전 분해 패널 */
+#analysis-panel {
+    position: fixed; 
+    top: 0; left: 0; bottom: 0;
+    width: 85%; max-width: 400px;
+    background: var(--card-bg);
+    border-right: 1px solid var(--border-color);
+    display: flex; flex-direction: column;
+    z-index: 2000; /* 팝업보다 높게 */
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    box-shadow: 5px 0 15px rgba(0,0,0,0.2);
+}
+#analysis-panel.show { transform: translateX(0); }
+
+/* 우측 주해창 */
 #commentary-area {
     width: 400px; background: var(--card-bg); border-left: 1px solid var(--border-color);
     display: flex; flex-direction: column; flex-shrink: 0; transition: transform 0.3s ease; z-index: 900;
@@ -128,6 +144,8 @@ h1 { margin: 0; font-size: 1.5rem; line-height: 1.2; }
     .hebrew-text { font-size: 1.3rem !important; }
     .nav-left-group { gap: 5px; }
     .location-text { font-size: 1rem; }
+    /* 모바일에서 1절 더 확실히 보이게 */
+    #bible-area { padding-top: 40px; }
 }
 
 .verse-item { padding: 15px; border-bottom: 1px solid var(--border-color); display: flex; gap: 12px; }
@@ -183,31 +201,34 @@ textarea { width: 100%; height: 300px; padding: 10px; border: 1px solid var(--bo
 .search-text { font-size: 1rem; line-height: 1.4; color: var(--text-color); }
 mark { background-color: #ffeeba; color: #333; padding: 0 2px; border-radius: 2px; }
 
-/* 원전 분해 스타일 */
+/* [수정] 원전 분해 스타일 (간격 축소, 색상 변경) */
 .analysis-header-line {
     font-size: 1.3rem; font-weight: bold; color: var(--text-color);
-    margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid var(--primary-color);
+    margin-bottom: 5px; /* 빨간 동그라미: 간격 축소 */
+    padding-bottom: 5px;
+    border-bottom: 2px solid var(--primary-color);
 }
-.analysis-container { display: flex; flex-direction: column; gap: 20px; }
-.analysis-word-item { margin-bottom: 15px; line-height: 1.7; font-size: 1.05rem; }
+.analysis-container { 
+    display: flex; flex-direction: column; 
+    gap: 8px; /* 초록 동그라미: 간격 축소 (20px -> 8px) */
+}
+.analysis-word-item { 
+    margin-bottom: 5px; /* 단어간 간격 축소 */
+    line-height: 1.4;   /* 줄간격 축소 */
+    font-size: 1.05rem; 
+}
 
+/* [수정] 원어: 진한 파란색 */
 .orig-word { 
     font-size: 1.3rem; 
     font-family: serif; 
     font-weight: bold; 
-    color: var(--text-color);
+    color: #00008B; /* 노란 동그라미: 찐한 파란색 (DarkBlue) */
 }
 .meaning-text { color: #e83e8c; font-weight: bold; }
 .grammar-arrow { color: #999; font-size: 0.9rem; margin-right: 5px; }
 
-/* [NEW] 사전 팝업 전용: ^ 앞 단어 스타일 (2배 크기) */
-.lexicon-huge-word {
-    font-size: 2rem;
-    font-weight: bold;
-    color: var(--primary-color);
-    font-family: serif;
-    margin-right: 5px;
-}
+.lexicon-huge-word { font-size: 2rem; font-weight: bold; color: var(--primary-color); font-family: serif; margin-right: 5px; }
 
 .copy-btn { width:100%; padding: 15px; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer; font-size: 1.1rem; text-align: left; transition: 0.2s; margin-bottom:10px; color: var(--text-color); }
 .copy-btn:hover { background: var(--hover-bg); border-color: var(--primary-color); color: var(--primary-color); }
