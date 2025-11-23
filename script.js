@@ -1,6 +1,7 @@
 // Render 서버 주소
 const AHPI_API_BASE_URL = "https://ahpi-bible-backend.onrender.com/api";
 
+// 성경 데이터 (책 이름: 장 수)
 const BIBLE_DATA = {
     "Genesis": 50, "Exodus": 40, "Leviticus": 27, "Numbers": 36, "Deuteronomy": 34,
     "Joshua": 24, "Judges": 21, "Ruth": 4, "1 Samuel": 31, "2 Samuel": 24, "1 Kings": 22, "2 Kings": 25, "1 Chronicles": 29, "2 Chronicles": 36, "Ezra": 10, "Nehemiah": 13, "Esther": 10,
@@ -13,6 +14,7 @@ const BIBLE_DATA = {
     "Hebrews": 13, "James": 5, "1 Peter": 5, "2 Peter": 3, "1 John": 5, "2 John": 1, "3 John": 1, "Jude": 1, "Revelation": 22
 };
 
+// 한글 책 이름 매핑
 const KOREAN_BOOK_NAMES = {
     "Genesis": "창세기", "Exodus": "출애굽기", "Leviticus": "레위기", "Numbers": "민수기", "Deuteronomy": "신명기",
     "Joshua": "여호수아", "Judges": "사사기", "Ruth": "룻기", "1 Samuel": "사무엘상", "2 Samuel": "사무엘하", "1 Kings": "열왕기상", "2 Kings": "열왕기하", "1 Chronicles": "역대상", "2 Chronicles": "역대하", "Ezra": "에스라", "Nehemiah": "느헤미야", "Esther": "에스더",
@@ -35,99 +37,117 @@ let currentVerse = 1;
 let loadedChapterData = { korean: {}, english: {}, original: {}, commentaries: {} };
 
 document.addEventListener("DOMContentLoaded", function() {
+    initSelectors(); 
     setupEventListeners();
     fetchChapter(currentBook, currentChapter);
 });
 
+// --- [수정됨] 절 선택창 관련 코드 삭제 ---
+function initSelectors() {
+    const otSelect = document.getElementById("ot-select");
+    const ntSelect = document.getElementById("nt-select");
+
+    OT_BOOKS.forEach(book => {
+        const option = document.createElement("option");
+        option.value = book;
+        option.innerText = KOREAN_BOOK_NAMES[book] || book;
+        otSelect.appendChild(option);
+    });
+
+    NT_BOOKS.forEach(book => {
+        const option = document.createElement("option");
+        option.value = book;
+        option.innerText = KOREAN_BOOK_NAMES[book] || book;
+        ntSelect.appendChild(option);
+    });
+
+    otSelect.value = "Genesis";
+    updateChapterOptions("Genesis");
+}
+
 function setupEventListeners() {
-    // 팝업 닫기
-    document.getElementById("nav-modal-close").onclick = () => document.getElementById("nav-modal").style.display = "none";
-    document.getElementById("lexicon-close").onclick = () => document.getElementById("lexicon-modal").style.display = "none";
-    document.getElementById("search-close").onclick = () => document.getElementById("search-result-modal").style.display = "none";
-
-    // [핵심 수정] 구약/신약 버튼 클릭 시 팝업 열기
-    document.getElementById("btn-ot").onclick = () => openBookGrid("OT");
-    document.getElementById("btn-nt").onclick = () => openBookGrid("NT");
-
-    // 이전/다음 버튼
+    document.getElementById("modal-close-button").onclick = () => document.getElementById("lexicon-modal").style.display = "none";
+    document.getElementById("search-close-button").onclick = () => document.getElementById("search-result-modal").style.display = "none";
     document.getElementById("prev-btn").onclick = goToPrevChapter;
     document.getElementById("next-btn").onclick = goToNextChapter;
-    
-    // 검색
+    document.getElementById("go-btn").onclick = navigateManual;
     document.getElementById("search-btn").onclick = performSearch;
     document.getElementById("search-input").onkeypress = (e) => { if(e.key === 'Enter') performSearch(); };
 
-    // 에디터 버튼
-    document.getElementById("edit-btn").onclick = openEditor;
-    document.getElementById("cancel-btn").onclick = closeEditor;
-    document.getElementById("save-btn").onclick = saveCommentary;
+    document.getElementById("ot-select").onchange = function() {
+        document.getElementById("nt-select").value = ""; // 신약 초기화
+        updateChapterOptions(this.value);
+    };
+
+    document.getElementById("nt-select").onchange = function() {
+        document.getElementById("ot-select").value = ""; // 구약 초기화
+        updateChapterOptions(this.value);
+    };
+
+    const editBtn = document.getElementById("edit-btn");
+    const saveBtn = document.getElementById("save-btn");
+    const cancelBtn = document.getElementById("cancel-btn");
+    editBtn.onclick = openEditor;
+    cancelBtn.onclick = closeEditor;
+    saveBtn.onclick = saveCommentary;
 }
 
-// --- [NEW] 책 목록 팝업 열기 ---
-function openBookGrid(type) {
-    const modal = document.getElementById("nav-modal");
-    const title = document.getElementById("nav-modal-title");
-    const grid = document.getElementById("nav-grid");
+function updateChapterOptions(bookName) {
+    const sel = document.getElementById("chapter-select");
+    sel.innerHTML = "";
+    const max = BIBLE_DATA[bookName] || 50;
     
-    modal.style.display = "flex";
-    grid.innerHTML = "";
-    
-    let books = [];
-    if (type === "OT") {
-        title.innerText = "구약 성경 선택";
-        books = OT_BOOKS;
-    } else {
-        title.innerText = "신약 성경 선택";
-        books = NT_BOOKS;
+    for(let i=1; i<=max; i++) {
+        const opt = document.createElement("option");
+        opt.value = i; opt.innerText = i;
+        sel.appendChild(opt);
     }
-
-    // 책 버튼 생성
-    books.forEach(book => {
-        const btn = document.createElement("div");
-        btn.className = "grid-btn";
-        btn.innerText = KOREAN_BOOK_NAMES[book] || book;
-        if (book === currentBook) btn.classList.add("selected");
-        
-        btn.onclick = () => {
-            // 책을 선택하면 -> 장 선택 화면으로 전환
-            openChapterGrid(book);
-        };
-        grid.appendChild(btn);
-    });
+    sel.value = 1; // 1장으로 리셋
 }
 
-// --- [NEW] 장(Chapter) 목록 팝업 ---
-function openChapterGrid(book) {
-    const title = document.getElementById("nav-modal-title");
-    const grid = document.getElementById("nav-grid");
+// --- [수정됨] 절 선택 로직 제거 ---
+function navigateManual() {
+    const otVal = document.getElementById("ot-select").value;
+    const ntVal = document.getElementById("nt-select").value;
     
-    title.innerText = `${KOREAN_BOOK_NAMES[book]} - 장 선택`;
-    grid.innerHTML = ""; // 기존 책 목록 지움
-
-    const maxChapter = BIBLE_DATA[book] || 50;
-
-    for (let i = 1; i <= maxChapter; i++) {
-        const btn = document.createElement("div");
-        btn.className = "grid-btn chapter-num"; // 숫자 스타일
-        btn.innerText = i;
-        
-        btn.onclick = () => {
-            // 장을 선택하면 -> 팝업 닫고 데이터 로드
-            currentBook = book;
-            currentChapter = i;
-            document.getElementById("nav-modal").style.display = "none";
-            fetchChapter(currentBook, currentChapter);
-        };
-        grid.appendChild(btn);
-    }
+    // 둘 중 값이 있는 것을 선택
+    const book = otVal || ntVal || currentBook;
+    const chapter = parseInt(document.getElementById("chapter-select").value);
+    
+    fetchChapter(book, chapter);
 }
 
-// --- [NEW] 텍스트 업데이트 ---
+// --- [수정됨] UI 업데이트 (절 관련 제거) ---
 function updateNavUI() {
-    document.getElementById("current-location").innerText = `${KOREAN_BOOK_NAMES[currentBook]} ${currentChapter}장`;
+    const isNT = NT_BOOKS.includes(currentBook);
+    
+    if (isNT) {
+        document.getElementById("nt-select").value = currentBook;
+        document.getElementById("ot-select").value = "";
+        
+        // 시각 효과
+        document.getElementById("nt-select").classList.add("active");
+        document.getElementById("nt-select").classList.remove("inactive");
+        document.getElementById("ot-select").classList.add("inactive");
+        document.getElementById("ot-select").classList.remove("active");
+    } else {
+        document.getElementById("ot-select").value = currentBook;
+        document.getElementById("nt-select").value = "";
+        
+        // 시각 효과
+        document.getElementById("ot-select").classList.add("active");
+        document.getElementById("ot-select").classList.remove("inactive");
+        document.getElementById("nt-select").classList.add("inactive");
+        document.getElementById("nt-select").classList.remove("active");
+    }
+
+    if (document.getElementById("chapter-select").options.length < currentChapter) {
+        updateChapterOptions(currentBook);
+    }
+    document.getElementById("chapter-select").value = currentChapter;
 }
 
-// --- 데이터 로드 및 렌더링 ---
+// --- 데이터 로드 ---
 async function fetchChapter(book, chapter) {
     currentBook = book;
     currentChapter = chapter;
@@ -146,7 +166,7 @@ async function fetchChapter(book, chapter) {
         const ahpiData = await res.json();
         
         loadedChapterData.korean = ahpiData.korean_verses || {};
-        loadedChapterData.english = ahpiData.english_verses || {};
+        loadedChapterData.english = ahpiData.english_verses || {}; 
         loadedChapterData.commentaries = ahpiData.commentaries || {};
         
         const isNT = NT_BOOKS.includes(book);
@@ -161,12 +181,21 @@ async function fetchChapter(book, chapter) {
             Object.keys(loadedChapterData.english).length
         );
 
+        // 영어 데이터 배열 처리
+        if (!Array.isArray(loadedChapterData.english)) {
+             let engArr = [];
+             for(let i=1; i<=maxVerse; i++) {
+                 engArr.push(loadedChapterData.english[i] || "");
+             }
+             loadedChapterData.english = engArr;
+        }
+
         renderBibleList(maxVerse);
-        selectVerse(1);
+        selectVerse(1); // 1절 자동 선택
 
     } catch (error) {
         console.error(error);
-        bibleList.innerHTML = "<p style='color:red'>데이터 로드 실패</p>";
+        bibleList.innerHTML = "<p style='color:red'>데이터를 가져오지 못했습니다.</p>";
     }
 }
 
@@ -194,12 +223,14 @@ function renderBibleList(maxVerse) {
             eng = loadedChapterData.english[i] || "";
         }
         const engHtml = renderEnglishWithStrongs(eng);
+
         const ori = loadedChapterData.original[i-1] || "";
 
         let html = `<span class="verse-num">${i}.</span>`;
         html += `<span class="korean-text">${kor}</span>`;
         html += `<span class="english-text">${engHtml}</span>`; 
         
+        // 원어 단어 처리
         const oriWords = ori.split(/\s+/).filter(w => w.length > 0);
         let oriHtml = "";
         oriWords.forEach(word => {
