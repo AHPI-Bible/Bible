@@ -178,7 +178,6 @@ async function fetchChapter(book, chapter) {
             }
         }
 
-        // 영어 배열 처리
         if (!Array.isArray(loadedChapterData.english)) {
              let engArr = [];
              for(let i=1; i<=maxVerse; i++) {
@@ -212,14 +211,12 @@ function renderBibleList(maxVerse) {
         div.onclick = () => selectVerse(i); 
 
         const kor = loadedChapterData.korean[i] || "";
-        // 영어
         let eng = "";
         if (Array.isArray(loadedChapterData.english)) {
             eng = loadedChapterData.english[i-1] || "";
         } else {
             eng = loadedChapterData.english[i] || "";
         }
-        // 스트롱 코드 파싱
         const engHtml = renderEnglishWithStrongs(eng);
 
         const ori = loadedChapterData.original[i-1] || "";
@@ -228,7 +225,6 @@ function renderBibleList(maxVerse) {
         html += `<span class="korean-text">${kor}</span>`;
         html += `<span class="english-text">${engHtml}</span>`; 
         
-        // 원어 단어 처리
         const oriWords = ori.split(/\s+/).filter(w => w.length > 0);
         let oriHtml = "";
         oriWords.forEach(word => {
@@ -314,12 +310,13 @@ async function handleEnglishClick(event) {
     modalBody.innerHTML = html;
 }
 
-// --- 원어 단어 클릭 ---
+// --- 원어 단어 클릭 (복원됨) ---
 function makeHebrewWordsClickable() {
     document.querySelectorAll('.hebrew-word').forEach(span => {
         span.addEventListener('click', handleWordClick);
     });
 }
+
 async function handleWordClick(event) {
     const rawWord = event.target.dataset.word;
     const modal = document.getElementById("lexicon-modal");
@@ -332,6 +329,7 @@ async function handleWordClick(event) {
 
     let html = `<h3 style="font-size:1.8rem; text-align:center; color:#007bff;">${rawWord}</h3>`;
     
+    // [사전 링크 추가]
     html += `<div style="display:flex; gap:10px; justify-content:center; margin-bottom:20px;">`;
     if (isHebrew) {
         html += `<a href="https://dict.naver.com/heko/#/search?query=${cleanWord}" target="_blank" style="padding:8px 15px; background:#03C75A; color:white; border-radius:5px; text-decoration:none;">네이버 히브리어</a>`;
