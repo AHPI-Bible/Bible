@@ -1,6 +1,7 @@
 // Render 서버 주소
 const AHPI_API_BASE_URL = "https://ahpi-bible-backend.onrender.com/api";
 
+// 성경 데이터
 const BIBLE_DATA = {
     "Genesis": 50, "Exodus": 40, "Leviticus": 27, "Numbers": 36, "Deuteronomy": 34,
     "Joshua": 24, "Judges": 21, "Ruth": 4, "1 Samuel": 31, "2 Samuel": 24, "1 Kings": 22, "2 Kings": 25, "1 Chronicles": 29, "2 Chronicles": 36, "Ezra": 10, "Nehemiah": 13, "Esther": 10,
@@ -57,7 +58,6 @@ function setupEventListeners() {
     document.getElementById("save-btn").onclick = saveCommentary;
 }
 
-// UI 팝업 관련
 function openBookGrid(type) {
     const modal = document.getElementById("nav-modal");
     const title = document.getElementById("nav-modal-title");
@@ -123,7 +123,6 @@ async function fetchChapter(book, chapter) {
     try {
         const res = await fetch(url);
         if(!res.ok) throw new Error("서버 응답 실패");
-        
         const ahpiData = await res.json();
         
         loadedChapterData.korean = ahpiData.korean_verses || {};
@@ -168,48 +167,60 @@ function renderBibleList(maxVerse) {
         div.id = `verse-row-${i}`; 
         div.onclick = () => selectVerse(i); 
 
-        // 한글/영어 스트롱 코드 파싱 적용
-        const korHtml = renderTextWithStrongs(loadedChapterData.korean[i] || "");
+        const rawKor = loadedChapterData.korean[i] || "";
         
-        let engRaw = "";
-        if (Array.isArray(loadedChapterData.english)) engRaw = loadedChapterData.english[i-1] || "";
-        else engRaw = loadedChapterData.english[i] || "";
-        
-        const engHtml = renderTextWithStrongs(engRaw);
+        let eng = "";
+        if (Array.isArray(loadedChapterData.english)) {
+            eng = loadedChapterData.english[i-1] || "";
+        } else {
+            eng = loadedChapterData.english[i] || "";
+        }
+        const engHtml = renderEnglishWithStrongs(eng);
+
+        // [핵심] 원어 본문 처리
         const ori = loadedChapterData.original[i-1] || "";
+        // 원어도 스트롱 코드(<WH1234> 등)가 있다면 파싱해서 링크를 걸어줌
+        // (현재 원본 파일에는 WH 코드가 없을 수도 있음. 일단 영어/한글처럼 처리)
+        // 만약 원어 데이터에도 <WH...>가 있다면 아래 코드가 작동함.
+        // 없다면 그냥 텍스트만 출력됨.
+        let oriHtml = renderTextWithStrongs(ori, "original"); 
 
         let html = `<span class="verse-num">${i}.</span>`;
-        html += `<span class="korean-text">${korHtml}</span>`;
+        // [핵심] 한글도 스트롱 코드 파싱 적용
+        html += `<span class="korean-text">${renderTextWithStrongs(rawKor, "kor")}</span>`;
         html += `<span class="english-text">${engHtml}</span>`; 
-        html += `<span class="hebrew-text">${ori}</span>`; // 원어는 그대로 출력 (스트롱 x)
+        html += `<span class="hebrew-text">${oriHtml}</span>`; 
 
         div.innerHTML = html;
         list.appendChild(div);
     }
     
-    // 이벤트 연결
+    // 이벤트 연결 (스트롱 코드 클릭)
     attachStrongClickEvents();
 }
 
-// --- [핵심] 스트롱 코드 파싱 (한글 <WH1234>, 영어 <H1234> 등) ---
-function renderTextWithStrongs(text) {
+// --- [핵심] 스트롱 코드 파싱 (한글/영어 공용) ---
+function renderTextWithStrongs(text, lang) {
     if (!text) return "";
     
-    // 태그 분리 정규식: <...> 패턴
-    const parts = text.split(/(<[A-Z0-9]+>)/);
+    // 정규식: <WH1234>, <H1234>, <G1234> 등 찾기
+    // WH, WG, H, G 모두 처리
+    const parts = text.split(/(<[A-Z]{1,2}\d+>)/);
     let html = "";
     let prevWord = "";
 
     for (let i = 0; i < parts.length; i++) {
         const part = parts[i];
-        // 스트롱 코드 태그인지 확인
+        // 태그 발견!
         if (part.startsWith("<") && part.endsWith(">")) {
-            // <WH7225> -> H7225 (W 제거)
-            let code = part.replace(/[<>W]/g, ""); 
-            
+            // <WH7225> -> H7225 (W 제거, H/G 남김)
+            // <G1234> -> G1234
+            let code = part.replace(/[<>]/g, ""); 
+            if(code.startsWith("W")) code = code.substring(1); // WH -> H
+
             if (prevWord.trim().length > 0) {
                 // 직전 단어에 링크 걸기
-                html += `<span class="strong-word" data-strong="${code}">${prevWord}</span>`;
+                html += `<span class="strong-word ${lang}" data-strong="${code}">${prevWord}</span>`;
                 prevWord = "";
             }
         } else {
@@ -243,7 +254,6 @@ function attachStrongClickEvents() {
                 if (data.content && data.content !== "사전 데이터가 없습니다.") {
                     html += `<div style="text-align:left; margin-top:15px; line-height:1.6; font-size:1rem;">${data.content}</div>`;
                 } else {
-                    // 데이터 없으면 BibleHub 링크
                     let link = code.startsWith('H') 
                         ? `https://biblehub.com/hebrew/${code.substring(1)}.htm`
                         : `https://biblehub.com/greek/${code.substring(1)}.htm`;
@@ -258,7 +268,7 @@ function attachStrongClickEvents() {
     });
 }
 
-// --- 기타 함수들 (기존 유지) ---
+// --- 기타 함수들 ---
 function selectVerse(verseNum) {
     currentVerse = verseNum;
     document.querySelectorAll(".verse-item").forEach(el => el.classList.remove("selected"));
