@@ -70,7 +70,6 @@ h1 { margin: 0; font-size: 1.5rem; line-height: 1.2; }
 .icon-btn { background: none; border: none; cursor: pointer; font-size: 1.2rem; color: var(--text-sub); padding: 5px; }
 .icon-btn:hover { color: var(--primary-color); }
 
-/* [NEW] 주해창 헤더용 작은 버튼 */
 .icon-btn-small {
     background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 4px;
     cursor: pointer; font-size: 0.8rem; padding: 2px 6px; color: var(--text-color); margin-left: 5px;
@@ -178,16 +177,35 @@ textarea { width: 100%; height: 300px; padding: 10px; border: 1px solid var(--bo
 .search-text { font-size: 1rem; line-height: 1.4; color: var(--text-color); }
 mark { background-color: #ffeeba; color: #333; padding: 0 2px; border-radius: 2px; }
 
-/* [NEW] 원전 분해 스타일 */
+/* [NEW] 원전 분해 전용 스타일 */
 .analysis-header-line {
     font-size: 1.3rem; font-weight: bold; color: var(--text-color);
     margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid var(--primary-color);
 }
-.analysis-list { display: flex; flex-direction: column; gap: 15px; }
-.analysis-item { font-size: 1rem; line-height: 1.6; }
-/* 만약 SDB의 HTML이 <table> 태그를 쓴다면 대응 */
-.analysis-item table { width: 100%; border-collapse: collapse; }
-.analysis-item td { padding: 5px; }
+.analysis-container { display: flex; flex-direction: column; gap: 20px; }
+.analysis-word-item { margin-bottom: 15px; line-height: 1.7; font-size: 1.05rem; }
+
+/* 원어: 폰트 키우기 (+2pt 느낌) */
+.orig-word { 
+    font-size: 1.3rem; /* 본문보다 큼 */
+    font-family: serif; 
+    font-weight: bold; 
+    color: var(--text-color);
+}
+
+/* 의미: 파란색 굵게 */
+.meaning-text { 
+    color: #cc00cc; /* 자주색 계열 (이미지 참조) 혹은 요청대로 파란색이면 #007bff */
+    color: #e83e8c; /* 요청하신 이미지의 분홍/자주색 느낌 */
+    font-weight: bold; 
+}
+
+/* 문법 화살표 */
+.grammar-arrow {
+    color: #999;
+    font-size: 0.9rem;
+    margin-right: 5px;
+}
 
 .copy-btn { width:100%; padding: 15px; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer; font-size: 1.1rem; text-align: left; transition: 0.2s; margin-bottom:10px; color: var(--text-color); }
 .copy-btn:hover { background: var(--hover-bg); border-color: var(--primary-color); color: var(--primary-color); }
