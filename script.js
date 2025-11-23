@@ -118,20 +118,45 @@ function navigateManual() {
     fetchChapter(book, chapter);
 }
 
+// --- [수정됨] UI 업데이트 (드롭다운 시각 효과 추가) ---
 function updateNavUI() {
+    const otSelect = document.getElementById("ot-select");
+    const ntSelect = document.getElementById("nt-select");
+    
     const isNT = NT_BOOKS.includes(currentBook);
+    
     if (isNT) {
-        document.getElementById("nt-select").value = currentBook;
-        document.getElementById("ot-select").value = "";
+        // 신약이 선택된 경우
+        ntSelect.value = currentBook;
+        otSelect.value = ""; // 구약 선택 해제
+        
+        // [시각 효과] 신약 강조, 구약 흐릿하게
+        ntSelect.classList.add("active");
+        ntSelect.classList.remove("inactive");
+        
+        otSelect.classList.add("inactive");
+        otSelect.classList.remove("active");
+        
     } else {
-        document.getElementById("ot-select").value = currentBook;
-        document.getElementById("nt-select").value = "";
+        // 구약이 선택된 경우
+        otSelect.value = currentBook;
+        ntSelect.value = ""; // 신약 선택 해제
+        
+        // [시각 효과] 구약 강조, 신약 흐릿하게
+        otSelect.classList.add("active");
+        otSelect.classList.remove("inactive");
+        
+        ntSelect.classList.add("inactive");
+        ntSelect.classList.remove("active");
     }
 
+    // 장 목록 업데이트 (현재 장이 목록 범위를 벗어나면 재생성)
     if (document.getElementById("chapter-select").options.length < currentChapter) {
         updateChapterOptions(currentBook);
     }
     document.getElementById("chapter-select").value = currentChapter;
+    
+    // (참고) 절 드롭다운 업데이트는 fetchHybridText 내부에서 처리됨
 }
 
 // --- 데이터 로드 ---
