@@ -1,6 +1,7 @@
 // Render 서버 주소
 const AHPI_API_BASE_URL = "https://ahpi-bible-backend.onrender.com/api";
 
+// 성경 데이터
 const BIBLE_DATA = {
     "Genesis": 50, "Exodus": 40, "Leviticus": 27, "Numbers": 36, "Deuteronomy": 34,
     "Joshua": 24, "Judges": 21, "Ruth": 4, "1 Samuel": 31, "2 Samuel": 24, "1 Kings": 22, "2 Kings": 25, "1 Chronicles": 29, "2 Chronicles": 36, "Ezra": 10, "Nehemiah": 13, "Esther": 10,
@@ -106,7 +107,6 @@ function updateNavUI() {
         document.getElementById("nt-select").value = currentBook;
         document.getElementById("nt-select").classList.add("active");
         document.getElementById("nt-select").classList.remove("inactive");
-        
         document.getElementById("ot-select").value = "";
         document.getElementById("ot-select").classList.add("inactive");
         document.getElementById("ot-select").classList.remove("active");
@@ -114,7 +114,6 @@ function updateNavUI() {
         document.getElementById("ot-select").value = currentBook;
         document.getElementById("ot-select").classList.add("active");
         document.getElementById("ot-select").classList.remove("inactive");
-        
         document.getElementById("nt-select").value = "";
         document.getElementById("nt-select").classList.add("inactive");
         document.getElementById("nt-select").classList.remove("active");
@@ -144,7 +143,7 @@ async function fetchChapter(book, chapter) {
     const bibleList = document.getElementById("bible-list");
     bibleList.innerHTML = "<p>데이터를 불러오는 중입니다...</p>";
     
-    // 오직 우리 서버만 호출 (모든 데이터가 여기 있음)
+    // AHPI 서버 호출 (한글/영어/원어/주해 모두 포함)
     const url = `${AHPI_API_BASE_URL}/get_chapter_data/${book}/${chapter}`;
     
     try {
@@ -153,31 +152,45 @@ async function fetchChapter(book, chapter) {
         
         const ahpiData = await res.json();
         
-        // 데이터 저장
         loadedChapterData.korean = ahpiData.korean_verses || {};
-        loadedChapterData.english = ahpiData.english_verses || {};
+        loadedChapterData.english = ahpiData.english_verses || {}; 
         loadedChapterData.commentaries = ahpiData.commentaries || {};
         
-        // 원어 선택
-        const isNT = NT_BOOKS.includes(book);
-        if (isNT) {
-            loadedChapterData.original = ahpiData.greek_verses || {};
-        } else {
-            loadedChapterData.original = ahpiData.hebrew_verses || {};
-        }
-
-        // 최대 절 수 계산
+        const serverGreek = ahpiData.greek_verses || {};
+        const serverHebrew = ahpiData.hebrew_verses || {};
+        
+        loadedChapterData.original = [];
         const maxVerse = Math.max(
             Object.keys(loadedChapterData.korean).length,
-            Object.keys(loadedChapterData.english).length
+            Object.keys(serverGreek).length,
+            Object.keys(serverHebrew).length
         );
+        
+        const isNT = NT_BOOKS.includes(book);
+
+        for(let i=1; i<=maxVerse; i++) {
+            if (isNT) {
+                loadedChapterData.original.push(serverGreek[i] || "");
+            } else {
+                loadedChapterData.original.push(serverHebrew[i] || "");
+            }
+        }
+
+        // 영어 데이터 배열 처리
+        if (!Array.isArray(loadedChapterData.english)) {
+             let engArr = [];
+             for(let i=1; i<=maxVerse; i++) {
+                 engArr.push(loadedChapterData.english[i] || "");
+             }
+             loadedChapterData.english = engArr;
+        }
 
         renderBibleList(maxVerse);
         selectVerse(1);
 
     } catch (error) {
         console.error(error);
-        bibleList.innerHTML = "<p style='color:red'>데이터를 가져오지 못했습니다. (API 서버 업데이트 필요)</p>";
+        bibleList.innerHTML = "<p style='color:red'>데이터를 가져오지 못했습니다.</p>";
     }
 }
 
@@ -196,17 +209,118 @@ function renderBibleList(maxVerse) {
         div.id = `verse-row-${i}`; 
         div.onclick = () => selectVerse(i); 
 
-        // 데이터가 문자열로 들어옴
         const kor = loadedChapterData.korean[i] || "";
-        const eng = loadedChapterData.english[i] || "";
-        const ori = loadedChapterData.original[i] || "";
+        
+        // 영어 처리 (배열 안전 접근)
+        let rawEng = "";
+        if (Array.isArray(loadedChapterData.english)) {
+            rawEng = loadedChapterData.english[i-1] || "";
+        } else {
+            rawEng = loadedChapterData.english[i] || "";
+        }
+
+        // 영어 텍스트 파싱 (스트롱 코드 처리)
+        const engHtml = renderEnglishWithStrongs(rawEng);
+
+        const ori = loadedChapterData.original[i-1] || "";
 
         let html = `<span class="verse-num">${i}.</span>`;
         html += `<span class="korean-text">${kor}</span>`;
-        html += `<span class="english-text">${eng}</span>`;
+        html += `<span class="english-text">${engHtml}</span>`; 
         
         // 원어 단어 처리
         const oriWords = ori.split(/\s+/).filter(w => w.length > 0);
         let oriHtml = "";
         oriWords.forEach(word => {
-            if (/[\u0590-\u05FF]/.test(word) || /[\u0370-\u03FF\u1F00-\u1FFF]/.
+            if (/[\u0590-\u05FF]/.test(word) || /[\u0370-\u03FF\u1F00-\u1FFF]/.test(word)) {
+                const cleanData = word.replace(/['".,;:]/g, '');
+                oriHtml += `<span class="hebrew-word" data-word="${cleanData}">${word}</span> `;
+            } else {
+                oriHtml += `${word} `;
+            }
+        });
+        html += `<span class="hebrew-text">${oriHtml}</span>`;
+
+        div.innerHTML = html;
+        list.appendChild(div);
+    }
+    
+    makeHebrewWordsClickable();
+    makeEnglishWordsClickable(); 
+}
+
+// --- 영어 스트롱 코드 파싱 ---
+function renderEnglishWithStrongs(text) {
+    if (!text) return "";
+    
+    const parts = text.split(/\s+/);
+    let resultHtml = "";
+    let currentWord = "";
+    
+    for (let i = 0; i < parts.length; i++) {
+        const part = parts[i];
+        // 스트롱 코드 태그 확인: <H1234> 또는 {H1234}
+        const match = part.match(/[<{]([HG]\d+)[>}]/);
+        
+        if (match) {
+            const strongCode = match[1]; 
+            if (currentWord) {
+                resultHtml += `<span class="eng-strong-word" data-strong="${strongCode}">${currentWord}</span> `;
+                currentWord = ""; 
+            }
+        } else {
+            if (currentWord) {
+                resultHtml += `${currentWord} `;
+            }
+            currentWord = part;
+        }
+    }
+    if (currentWord) {
+        resultHtml += `${currentWord}`;
+    }
+    return resultHtml;
+}
+
+function makeEnglishWordsClickable() {
+    document.querySelectorAll('.eng-strong-word').forEach(span => {
+        span.addEventListener('click', handleEnglishClick);
+        span.style.cursor = "pointer";
+        span.style.textDecoration = "underline";
+        span.style.textDecorationColor = "#ccc";
+    });
+}
+
+async function handleEnglishClick(event) {
+    const strongCode = event.target.dataset.strong; 
+    const word = event.target.innerText;
+    
+    const modal = document.getElementById("lexicon-modal");
+    const modalBody = document.getElementById("modal-body");
+    modal.style.display = "flex"; 
+    modalBody.innerHTML = `<p>검색 중: ${strongCode}...</p>`;
+
+    let html = `<h3 style="font-size:1.8rem; color:#007bff;">${word} (${strongCode})</h3>`;
+    let link = "";
+    if (strongCode.startsWith("H")) { 
+        const num = strongCode.substring(1); 
+        link = `https://biblehub.com/hebrew/${num}.htm`;
+        html += `<p>히브리어 사전으로 연결됩니다.</p>`;
+    } else { 
+        const num = strongCode.substring(1);
+        link = `https://biblehub.com/greek/${num}.htm`;
+        html += `<p>헬라어 사전으로 연결됩니다.</p>`;
+    }
+    
+    html += `<div style="margin-top:20px;">
+                <a href="${link}" target="_blank" 
+                   style="padding:12px; background:#f1f3f5; border-radius:8px; text-decoration:none; color:#333; font-weight:bold; border:1px solid #ddd; display:block; text-align:center;">
+                   📘 BibleHub 사전 보기 ↗
+                </a>
+             </div>`;
+    
+    modalBody.innerHTML = html;
+}
+
+// --- 원어 단어 클릭 ---
+function makeHebrewWordsClickable() {
+    document.querySelectorAll('.hebrew
