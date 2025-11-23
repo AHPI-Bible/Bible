@@ -103,6 +103,7 @@ function setupEventListeners() {
     document.getElementById("btn-comm-font-minus").onclick = () => changeCommFontSize(-10);
 
     document.getElementById("close-analysis-btn").onclick = closeAnalysisPanel;
+    // [FIX] Lexicon Panel 닫기 버튼을 깔끔하게 연결
     document.getElementById("close-lexicon-btn").onclick = closeLexiconPanel;
     document.getElementById("close-commentary-btn").onclick = () => {
         if(window.innerWidth <= 768) toggleCommentary();
@@ -144,7 +145,9 @@ function setupEventListeners() {
     document.getElementById("chk-ori").onchange = () => toggleBibleVersionVisibility("ori");
 }
 
-// --- [누락되었던 네비게이션 함수들 복구] ---
+// --- [Utility Functions - Text and Navigation] ---
+
+// [FIXED] ReferenceError (goToPrevChapter/NextChapter, history functions were previously missing or misplaced)
 function goToNextChapter() {
     if(currentChapter < BIBLE_DATA[currentBook]) loadChapter(currentBook, currentChapter + 1, true);
     else {
@@ -160,18 +163,10 @@ function goToPrevChapter() {
     }
 }
 function goHistoryBack() {
-    if (historyIndex > 0) { 
-        historyIndex--; isHistoryNavigating = true; 
-        loadChapter(historyStack[historyIndex].book, historyStack[historyIndex].chapter, false); 
-        updateHistoryButtons(); 
-    }
+    if (historyIndex > 0) { historyIndex--; isHistoryNavigating = true; loadChapter(historyStack[historyIndex].book, historyStack[historyIndex].chapter, false); updateHistoryButtons(); }
 }
 function goHistoryForward() {
-    if (historyIndex < historyStack.length - 1) { 
-        historyIndex++; isHistoryNavigating = true; 
-        loadChapter(historyStack[historyIndex].book, historyStack[historyIndex].chapter, false); 
-        updateHistoryButtons(); 
-    }
+    if (historyIndex < historyStack.length - 1) { historyIndex++; isHistoryNavigating = true; loadChapter(historyStack[historyIndex].book, historyStack[historyIndex].chapter, false); updateHistoryButtons(); }
 }
 function addToHistory(book, chapter) {
     if (historyIndex >= 0) { const curr = historyStack[historyIndex]; if (curr.book === book && curr.chapter === chapter) return; }
@@ -185,7 +180,46 @@ function updateHistoryButtons() {
     document.getElementById("hist-fwd-btn").style.opacity = (historyIndex >= historyStack.length - 1) ? "0.5" : "1";
 }
 
-// --- [나머지 핵심 함수들] ---
+
+/**
+ * 텍스트 내 스트롱 코드를 찾아 span 태그로 감싸주는 함수
+ * [FIXED] Missing function restored
+ */
+function renderTextWithStrongs(text, lang) {
+    if (!text) return "";
+    const parts = text.split(/(<[A-Z]{1,2}\d+>)/);
+    let html = ""; let prevWord = "";
+    for (let i = 0; i < parts.length; i++) {
+        const part = parts[i];
+        if (part.startsWith("<") && part.endsWith(">")) {
+            let code = part.replace(/[<>]/g, ""); 
+            if(code.startsWith("W")) code = code.substring(1);
+            if (prevWord.trim().length > 0) { html += `<span class="strong-word ${lang}" data-strong="${code}">${prevWord}</span>`; prevWord = ""; }
+        } else { if (prevWord) html += prevWord; prevWord = part; }
+    }
+    if (prevWord) html += prevWord;
+    return html;
+}
+
+/**
+ * 원어 텍스트를 클릭 가능한 단어로 분리하는 함수
+ * [FIXED] Missing function restored
+ */
+function renderOriginalText(text) {
+    const words = text.split(/\s+/).filter(w => w.length > 0);
+    let html = "";
+    words.forEach(word => {
+        if (/[\u0590-\u05FF]/.test(word) || /[\u0370-\u03FF\u1F00-\u1FFF]/.test(word)) {
+            const cleanData = word.replace(/['".,;:]/g, '');
+            html += `<span class="hebrew-word" data-word="${cleanData}">${word}</span> `;
+        } else {
+            html += `${word} `;
+        }
+    });
+    return html;
+}
+
+// --- [Authorization and Authentication Logic] ---
 
 function updateAuthorizationUI() {
     const editBtn = document.getElementById("edit-btn");
@@ -231,6 +265,8 @@ function handleLogout() {
     showToast("로그아웃되었습니다.");
     updateAuthorizationUI();
 }
+
+// --- [Editor & Commentary Logic] ---
 
 function setEditorMode(type) {
     currentEditorMode = type;
@@ -571,105 +607,6 @@ function parseAnalysisText(text) {
     return resultHtml;
 }
 
-function renderOriginalText(text) {
-    return text.split(/\s+/).filter(w => w.length > 0).map(word => {
-        if (/[\u0590-\u05FF]/.test(word) || /[\u0370-\u03FF\u1F00-\u1FFF]/.test(word)) {
-            return `<span class="hebrew-word" data-word="${word.replace(/['".,;:]/g, '')}">${word}</span> `;
-        }
-        return `${word} `;
-    }).join("");
-}
-
-function showToast(msg) {
-    const toast = document.getElementById("toast-message");
-    toast.innerText = msg;
-    toast.classList.remove("hidden");
-    setTimeout(() => toast.classList.add("hidden"), 1000);
-}
-
-function openBookGrid(type) {
-    const modal = document.getElementById("nav-modal");
-    const grid = document.getElementById("nav-grid");
-    modal.style.display = "flex";
-    grid.innerHTML = "";
-    let books = type === "OT" ? OT_BOOKS : NT_BOOKS;
-    document.getElementById("nav-modal-title").innerText = type === "OT" ? "구약 성경 선택" : "신약 성경 선택";
-    books.forEach(book => {
-        const btn = document.createElement("div");
-        btn.className = "grid-btn";
-        btn.innerText = KOREAN_BOOK_NAMES[book] || book;
-        if (book === currentBook) btn.classList.add("selected");
-        btn.onclick = () => { openChapterGrid(book); };
-        grid.appendChild(btn);
-    });
-}
-
-function openChapterGrid(book) {
-    const modal = document.getElementById("chapter-nav-modal");
-    const grid = document.getElementById("chapter-grid");
-    document.getElementById("nav-modal").style.display = "none";
-    document.getElementById("chapter-modal-title").innerText = `${KOREAN_BOOK_NAMES[book]} - 장 선택`;
-    modal.style.display = "flex";
-    grid.innerHTML = "";
-    const maxChapter = BIBLE_DATA[book] || 50;
-    for (let i = 1; i <= maxChapter; i++) {
-        const btn = document.createElement("div");
-        btn.className = "grid-btn chapter-num";
-        btn.innerText = i;
-        if (book === currentBook && i === currentChapter) btn.classList.add("selected");
-        btn.onclick = () => { document.getElementById("chapter-nav-modal").style.display = "none"; loadChapter(book, i, true); };
-        grid.appendChild(btn);
-    }
-}
-
-function updateNavUI() {
-    document.getElementById("current-location").innerText = `${KOREAN_BOOK_NAMES[currentBook]} ${currentChapter}장`;
-    if (NT_BOOKS.includes(currentBook)) { document.getElementById("btn-nt").classList.add("active"); document.getElementById("btn-ot").classList.remove("active"); } 
-    else { document.getElementById("btn-ot").classList.add("active"); document.getElementById("btn-nt").classList.remove("active"); }
-}
-
-function attachStrongClickEvents() {
-    document.querySelectorAll('.strong-word').forEach(span => {
-        span.addEventListener('click', (e) => {
-            e.stopPropagation();
-            openLexiconModal(e.target.dataset.strong, e.target.innerText);
-        });
-    });
-}
-function makeHebrewWordsClickable() {
-    document.querySelectorAll('.hebrew-word').forEach(span => {
-        span.addEventListener('click', (e) => { e.stopPropagation(); });
-    });
-}
-
-async function openLexiconModal(code, word) {
-    if (window.innerWidth <= 1024) { loadLexiconToLeftPanel(code, word); return; }
-    const modal = document.getElementById("lexicon-modal");
-    modal.style.display = "flex"; 
-    document.getElementById("modal-body").innerHTML = `<p>사전 찾는 중: ${code}...</p>`;
-    await fetchAndRenderLexicon(code, word, document.getElementById("modal-body"));
-}
-
-async function loadLexiconToLeftPanel(code, word) {
-    const panel = document.getElementById("lexicon-panel");
-    panel.classList.add("show");
-    document.getElementById("lexicon-content").innerHTML = `<p style="padding:10px;">사전 찾는 중: ${code}...</p>`;
-    await fetchAndRenderLexicon(code, word, document.getElementById("lexicon-content"));
-}
-
-async function fetchAndRenderLexicon(code, word, targetElement) {
-    try {
-        const res = await fetch(`${AHPI_API_BASE_URL}/lexicon/${code}`);
-        const data = await res.json();
-        if (data.content && data.content !== "사전 데이터가 없습니다.") {
-            targetElement.innerHTML = `<div style="text-align:left; line-height:1.6; font-size:1rem; padding:10px;">${data.content.replace(/([^\s]+)\^/g, '<span class="lexicon-huge-word">$1</span>').replace(/\^/g, '')}</div>`;
-        } else {
-            let link = code.startsWith('H') ? `https://biblehub.com/hebrew/${code.substring(1)}.htm` : `https://biblehub.com/greek/${code.substring(1)}.htm`;
-            targetElement.innerHTML = `<p style="color:red; text-align:center; padding:10px;">사전 데이터 없음</p><div style="text-align:center; margin-top:15px;"><a href="${link}" target="_blank" style="padding:8px; background:#eee; border-radius:5px;">BibleHub에서 보기</a></div>`;
-        }
-    } catch (err) { targetElement.innerHTML = "<p style='padding:10px;'>통신 오류</p>"; }
-}
-
 function selectVerse(verseNum) {
     currentVerse = verseNum;
     document.querySelectorAll(".verse-item").forEach(el => el.classList.remove("selected"));
@@ -722,3 +659,5 @@ window.goToSearchResult = function(b, c, v) {
     document.getElementById("search-result-modal").style.display = "none";
     loadChapter(b, c, true);
 };
+
+const BOOK_INFO = KOREAN_BOOK_NAMES;
