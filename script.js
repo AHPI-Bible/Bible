@@ -1,7 +1,8 @@
-// Render 서버 주소
+// Render 서버 주소 (배포 시 주석 해제)
 const AHPI_API_BASE_URL = "https://ahpi-bible-backend.onrender.com/api";
+// 로컬 테스트용
+// const AHPI_API_BASE_URL = "http://127.0.0.1:5000/api";
 
-// 성경 데이터 (책 이름: 장 수)
 const BIBLE_DATA = {
     "Genesis": 50, "Exodus": 40, "Leviticus": 27, "Numbers": 36, "Deuteronomy": 34,
     "Joshua": 24, "Judges": 21, "Ruth": 4, "1 Samuel": 31, "2 Samuel": 24, "1 Kings": 22, "2 Kings": 25, "1 Chronicles": 29, "2 Chronicles": 36, "Ezra": 10, "Nehemiah": 13, "Esther": 10,
@@ -66,23 +67,19 @@ function setupEventListeners() {
     document.getElementById("cancel-btn").onclick = closeEditor;
     document.getElementById("save-btn").onclick = saveCommentary;
 
-    // [NEW] 모바일 주해창 토글
     document.getElementById("toggle-commentary-btn").onclick = toggleCommentary;
     document.getElementById("close-commentary-btn").onclick = toggleCommentary;
 
-    // [NEW] 복사 버튼 이벤트
     document.getElementById("copy-kor").onclick = () => executeCopy('kor');
     document.getElementById("copy-eng").onclick = () => executeCopy('eng');
     document.getElementById("copy-ori").onclick = () => executeCopy('ori');
 }
 
-// --- 모바일 주해창 제어 ---
 function toggleCommentary() {
     const panel = document.getElementById("commentary-area");
     panel.classList.toggle("show");
 }
 
-// --- 복사 기능 ---
 function openCopyModal(kor, eng, ori, verse) {
     tempCopyData = { kor, eng, ori, verse };
     document.getElementById("copy-modal").style.display = "flex";
@@ -94,11 +91,9 @@ function executeCopy(lang) {
     else if(lang === 'eng') text = tempCopyData.eng;
     else text = tempCopyData.ori;
 
-    // 태그 제거
     const cleanText = text.replace(/<[^>]*>?/gm, '');
     const info = BOOK_INFO[currentBook] || { ko: currentBook, kabbr: currentBook, abbr: currentBook.substring(0,3) };
     
-    // 책 약어 결정 (한글: 첫글자 / 영어: 앞 3글자)
     let abbr = info.abbr;
     if(lang === 'kor' && KOREAN_BOOK_NAMES[currentBook]) {
         const korName = KOREAN_BOOK_NAMES[currentBook];
@@ -114,7 +109,6 @@ function executeCopy(lang) {
     });
 }
 
-// --- 데이터 로드 및 리스트 렌더링 ---
 function loadChapter(book, chapter, pushToHistory = true) {
     currentBook = book;
     currentChapter = chapter;
@@ -160,55 +154,62 @@ async function fetchChapterData(book, chapter) {
     }
 }
 
-// [핵심] 리스트 렌더링
+// [핵심 변경] 리스트 렌더링 수정
 function renderBibleList(maxVerse) {
     const list = document.getElementById("bible-list");
     list.innerHTML = "";
     if (maxVerse === 0) { list.innerHTML = "<p>본문이 없습니다.</p>"; return; }
 
     const isNT = NT_BOOKS.includes(currentBook);
-    const analysisIcon = isNT ? "α" : "א"; // 헬라어는 알파, 히브리어는 알렢
+    const analysisIcon = isNT ? "α" : "א"; 
 
     for (let i = 1; i <= maxVerse; i++) {
         const div = document.createElement("div");
         div.className = "verse-item";
         div.id = `verse-row-${i}`; 
         
+        // [중요] 배경 클릭 시: 선택만 함 (주해창 안 열림)
         div.onclick = (e) => {
-            // 아이콘, 팝업, 단어 클릭 시에는 본문 선택 방지
-            if(e.target.tagName === 'SPAN' && (
-                e.target.classList.contains('action-icon') || 
-                e.target.classList.contains('analysis-icon') || 
-                e.target.classList.contains('strong-word') || 
-                e.target.classList.contains('hebrew-word') || 
-                e.target.classList.contains('material-icons')
-            )) return;
-            
+            // 아이콘 등 클릭 시 이벤트 버블링으로 인한 중복 실행 방지
+            if(e.target.closest('.left-column') || e.target.closest('.strong-word') || e.target.closest('.hebrew-word')) return;
             selectVerse(i);
-            // 모바일이면 주해창 열기
-            if (window.innerWidth <= 768) {
-                document.getElementById("commentary-area").classList.add("show");
-            }
         };
 
         const korRaw = loadedChapterData.korean[i] || "";
         const engRaw = Array.isArray(loadedChapterData.english) ? (loadedChapterData.english[i-1] || "") : (loadedChapterData.english[i] || "");
         const ori = loadedChapterData.original[i-1] || "";
+        const commentContent = loadedChapterData.commentaries[i];
+        
+        // 주해 내용 여부에 따른 클래스 지정
+        const commIconClass = commentContent ? "material-icons left-icon-btn comm-icon has-content" : "material-icons left-icon-btn comm-icon";
 
         const korHtml = renderTextWithStrongs(korRaw, "kor");
         const engHtml = renderTextWithStrongs(engRaw, "eng");
 
-        // [구조] 좌측(숫자+분해) | 우측(본문들 + 통합 복사)
+        // [구조 변경] 좌측 열에 아이콘 3개 세로 배치
         let html = `
             <div class="left-column">
                 <div class="verse-num">${i}.</div>
-                <div class="analysis-icon" title="원전 분해" onclick="openAnalysisModal('${ori.replace(/'/g, "\\'")}')">${analysisIcon}</div>
+                
+                <div class="left-icon-btn analysis-icon" title="원전 분해" 
+                     onclick="openAnalysisModal('${ori.replace(/'/g, "\\'")}')">
+                     ${analysisIcon}
+                </div>
+                
+                <div class="${commIconClass}" title="주해 보기" 
+                     onclick="handleCommentaryClick(${i})">
+                     article
+                </div>
+                
+                <div class="material-icons left-icon-btn copy-icon-left" title="복사" 
+                     onclick="openCopyModal('${korRaw.replace(/'/g, "\\'")}', '${engRaw.replace(/'/g, "\\'")}', '${ori.replace(/'/g, "\\'")}', ${i})">
+                     content_copy
+                </div>
             </div>
+            
             <div class="text-column">
                 <div class="verse-line">
                     <span class="korean-text">${korHtml}</span>
-                    <!-- 통합 복사 아이콘 -->
-                    <span class="material-icons action-icon copy-icon" onclick="openCopyModal('${korRaw.replace(/'/g, "\\'")}', '${engRaw.replace(/'/g, "\\'")}', '${ori.replace(/'/g, "\\'")}', ${i})">content_copy</span>
                 </div>
                 <div class="verse-line">
                     <span class="english-text">${engHtml}</span>
@@ -226,6 +227,15 @@ function renderBibleList(maxVerse) {
     makeHebrewWordsClickable();
 }
 
+// [NEW] 주해 아이콘 클릭 핸들러
+function handleCommentaryClick(verseNum) {
+    selectVerse(verseNum); // 1. 절 선택
+    // 2. 모바일이면 주해창 강제 열기
+    if (window.innerWidth <= 768) {
+        document.getElementById("commentary-area").classList.add("show");
+    }
+}
+
 // 원어 단어 렌더링
 function renderOriginalText(text) {
     const words = text.split(/\s+/).filter(w => w.length > 0);
@@ -241,7 +251,6 @@ function renderOriginalText(text) {
     return html;
 }
 
-// --- 기타 유틸리티 ---
 function showToast(msg) {
     const toast = document.getElementById("toast-message");
     toast.innerText = msg;
@@ -389,21 +398,31 @@ async function saveCommentary() {
     alert("저장 완료");
     loadedChapterData.commentaries[currentVerse] = content;
     selectVerse(currentVerse);
+    
+    // [NEW] 주해 저장 후 아이콘 상태 업데이트 (파란색으로 변경)
+    const row = document.getElementById(`verse-row-${currentVerse}`);
+    if (row) {
+        const icon = row.querySelector('.comm-icon');
+        if (icon) {
+            icon.classList.add('has-content');
+        }
+    }
+    
     btn.innerText = "저장";
     closeEditor();
 }
 function goToNextChapter() {
     if(currentChapter < BIBLE_DATA[currentBook]) loadChapter(currentBook, currentChapter + 1, true);
     else {
-        const idx = BOOK_NAMES.indexOf(currentBook);
-        if(idx < BOOK_NAMES.length-1) loadChapter(BOOK_NAMES[idx+1], 1, true);
+        const idx = OT_BOOKS.concat(NT_BOOKS).indexOf(currentBook);
+        if(idx < ALL_BOOKS.length-1) loadChapter(ALL_BOOKS[idx+1], 1, true);
     }
 }
 function goToPrevChapter() {
     if(currentChapter > 1) loadChapter(currentBook, currentChapter - 1, true);
     else {
-        const idx = BOOK_NAMES.indexOf(currentBook);
-        if(idx > 0) loadChapter(BOOK_NAMES[idx-1], BIBLE_DATA[BOOK_NAMES[idx-1]], true);
+        const idx = OT_BOOKS.concat(NT_BOOKS).indexOf(currentBook);
+        if(idx > 0) loadChapter(ALL_BOOKS[idx-1], BIBLE_DATA[ALL_BOOKS[idx-1]], true);
     }
 }
 async function performSearch() {
@@ -429,5 +448,4 @@ window.goToSearchResult = function(b, c, v) {
     document.getElementById("search-result-modal").style.display = "none";
     loadChapter(b, c, true);
 };
-// 약어 매핑 (복사 기능용)
 const BOOK_INFO = KOREAN_BOOK_NAMES;

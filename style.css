@@ -63,7 +63,7 @@ h1 { margin: 0; font-size: 1.5rem; line-height: 1.2; }
 .container {
     display: flex;
     flex: 1;
-    margin: 0; /* 여백 제거하여 공간 확보 */
+    margin: 0;
     overflow: hidden;
     position: relative;
 }
@@ -80,14 +80,25 @@ h1 { margin: 0; font-size: 1.5rem; line-height: 1.2; }
 
 /* 주해 영역 (PC 기본: 우측 고정) */
 #commentary-area {
-    width: 400px; /* 고정 너비 */
+    width: 400px; /* PC 기본값 */
     background: #fdfdfd;
     border-left: 1px solid #ddd;
     display: flex;
     flex-direction: column;
     flex-shrink: 0;
-    transition: transform 0.3s ease; /* 슬라이드 애니메이션 */
+    transition: transform 0.3s ease;
     z-index: 900;
+}
+
+/* [NEW] 안드로이드 패드 및 태블릿 모드 (60:40 비율 적용) */
+@media (min-width: 769px) and (max-width: 1280px) {
+    #bible-area {
+        flex: 6; /* 60% */
+    }
+    #commentary-area {
+        width: auto !important; /* 고정 너비 해제 */
+        flex: 4; /* 40% */
+    }
 }
 
 .panel-header {
@@ -102,28 +113,28 @@ h1 { margin: 0; font-size: 1.5rem; line-height: 1.2; }
 }
 .scrollable-content { flex: 1; overflow-y: auto; padding: 15px; }
 
-/* [NEW] 모바일 전용 스타일 */
+/* 모바일 전용 스타일 */
 .mobile-only { display: none; }
 
 @media (max-width: 768px) {
     .mobile-only { display: inline-block; }
     
-    /* 모바일에서는 주해창을 화면 오른쪽 밖으로 숨김 */
+    /* 모바일: 주해창 숨김 및 슬라이드 */
     #commentary-area {
         position: absolute;
         top: 0; right: 0; bottom: 0;
-        width: 90%;
+        width: 85%;
         max-width: 400px;
         box-shadow: -5px 0 15px rgba(0,0,0,0.3);
         transform: translateX(100%); 
         background-color: #fff;
     }
-    /* 활성화 클래스 (자바스크립트로 토글) */
+    /* 활성화 클래스 */
     #commentary-area.show {
         transform: translateX(0);
     }
     
-    /* 모바일 폰트 조정 */
+    /* 폰트 조정 */
     .korean-text { font-size: 1.1rem !important; }
     .hebrew-text { font-size: 1.3rem !important; }
     .nav-left-group { gap: 5px; }
@@ -135,42 +146,58 @@ h1 { margin: 0; font-size: 1.5rem; line-height: 1.2; }
     padding: 15px;
     border-bottom: 1px solid #eee;
     display: flex;
-    gap: 12px; /* 좌우 열 간격 */
+    gap: 12px;
 }
 .verse-item:hover { background-color: #f9f9f9; }
 .verse-item.selected { background-color: #e8f0fe; }
 
-/* [NEW] 좌측 열 (숫자 + 원전분해 아이콘) */
+/* [NEW] 좌측 열 스타일 (세로 배치) */
 .left-column {
     display: flex;
     flex-direction: column;
     align-items: center;
-    min-width: 30px;
-    gap: 8px;
+    min-width: 40px; /* 너비 약간 확보 */
+    gap: 12px; /* 아이콘 간 간격 */
     padding-top: 2px;
 }
-.verse-num { font-weight: bold; color: #007bff; font-size: 1.1rem; }
-/* 원전분해 아이콘 */
-.analysis-icon {
+.verse-num { font-weight: bold; color: #007bff; font-size: 1.1rem; margin-bottom: 2px; }
+
+/* 공통 아이콘 스타일 */
+.left-icon-btn {
     cursor: pointer;
-    font-size: 1.2rem;
-    color: #dc3545;
-    font-weight: bold;
-    opacity: 0.6;
+    font-size: 1.2rem; /* 아이콘 크기 */
+    color: #aaa;
     transition: 0.2s;
-    padding: 5px;
-    border: 1px solid transparent;
+    padding: 4px;
     border-radius: 4px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
-.analysis-icon:hover {
-    opacity: 1;
-    transform: scale(1.1);
-    color: #a71d2a;
-    background-color: #ffeef0;
-    border-color: #f5c6cb;
+.left-icon-btn:hover {
+    background-color: #eee;
+    color: #333;
 }
 
-/* [NEW] 우측 열 (본문 텍스트) */
+/* 1. 원전분해 아이콘 */
+.analysis-icon {
+    font-weight: bold;
+    color: #dc3545; /* 붉은 계열 */
+    font-family: serif;
+}
+.analysis-icon:hover { color: #a71d2a; transform: scale(1.1); }
+
+/* 2. 주해 아이콘 */
+.comm-icon { color: #ccc; } /* 내용 없을 때 */
+.comm-icon.has-content { color: #007bff; } /* 내용 있을 때 파란색 */
+.comm-icon:hover { transform: scale(1.1); }
+
+/* 3. 복사 아이콘 */
+.copy-icon-left { color: #666; font-size: 1.1rem; }
+.copy-icon-left:hover { color: #28a745; }
+
+
+/* 우측 열 (본문 텍스트) */
 .text-column { flex: 1; }
 .verse-line {
     margin-bottom: 6px;
@@ -185,17 +212,6 @@ h1 { margin: 0; font-size: 1.5rem; line-height: 1.2; }
 .english-text { display: block; font-size: 1rem; color: #666; font-family: serif; margin-top: 2px; width: 100%; }
 .hebrew-text { display: block; font-size: 1.5rem; color: #000; font-family: serif; direction: rtl; margin-top: 8px; width: 100%; text-align: right;}
 .greek-text { display: block; font-size: 1.3rem; color: #000; font-family: serif; margin-top: 5px; width: 100%; }
-
-/* [NEW] 통합 복사 아이콘 */
-.copy-icon {
-    cursor: pointer;
-    color: #bbb;
-    font-size: 1.2rem;
-    margin-left: 8px;
-    vertical-align: middle;
-    transition: color 0.2s;
-}
-.copy-icon:hover { color: #28a745; }
 
 /* 단어 스타일 */
 .hebrew-word { cursor: pointer; }
@@ -220,19 +236,16 @@ textarea { width: 100%; height: 300px; padding: 10px; border: 1px solid #ddd; bo
 .close-btn:hover { color: #000; }
 .close-icon { cursor: pointer; font-size: 24px; color: #555; }
 
-/* [NEW] 복사 옵션 버튼 */
 .copy-options { display: flex; flex-direction: column; gap: 10px; }
 .copy-btn { padding: 15px; background: #f8f9fa; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; font-size: 1.1rem; text-align: left; transition: 0.2s; }
 .copy-btn:hover { background: #e2e6ea; border-color: #007bff; color: #007bff; }
 
-/* 그리드 */
 .grid-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; margin-top: 15px; }
 .number-grid { grid-template-columns: repeat(auto-fill, minmax(50px, 1fr)); }
 .grid-btn { padding: 12px 5px; background: #f8f9fa; border: 1px solid #ddd; border-radius: 5px; text-align: center; cursor: pointer; font-size: 1rem; }
 .grid-btn:hover { background: #e2e6ea; border-color: #adb5bd; }
 .grid-btn.selected { background: #007bff; color: white; border-color: #007bff; }
 
-/* 토스트 */
 .toast { visibility: visible; min-width: 200px; background-color: #333; color: #fff; text-align: center; border-radius: 4px; padding: 10px; position: fixed; z-index: 3000; left: 50%; bottom: 30px; transform: translateX(-50%); opacity: 1; transition: opacity 0.5s, bottom 0.5s; }
 .toast.hidden { visibility: hidden; opacity: 0; bottom: 0; }
 
