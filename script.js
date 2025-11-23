@@ -1,6 +1,6 @@
-// Render 서버 주소 (배포 시 주석 해제)
+// Render 서버 주소 (배포 시 사용)
 const AHPI_API_BASE_URL = "https://ahpi-bible-backend.onrender.com/api";
-// 로컬 테스트용
+// 로컬 테스트 시 아래 주석 해제 후 사용
 // const AHPI_API_BASE_URL = "http://127.0.0.1:5000/api";
 
 const BIBLE_DATA = {
@@ -154,7 +154,7 @@ async function fetchChapterData(book, chapter) {
     }
 }
 
-// [핵심 변경] 리스트 렌더링 수정
+// [핵심 변경] 리스트 렌더링 수정 (3가지 아이콘 배치)
 function renderBibleList(maxVerse) {
     const list = document.getElementById("bible-list");
     list.innerHTML = "";
@@ -168,9 +168,8 @@ function renderBibleList(maxVerse) {
         div.className = "verse-item";
         div.id = `verse-row-${i}`; 
         
-        // [중요] 배경 클릭 시: 선택만 함 (주해창 안 열림)
+        // 배경 클릭 시: 선택만 함 (주해창 안 열림)
         div.onclick = (e) => {
-            // 아이콘 등 클릭 시 이벤트 버블링으로 인한 중복 실행 방지
             if(e.target.closest('.left-column') || e.target.closest('.strong-word') || e.target.closest('.hebrew-word')) return;
             selectVerse(i);
         };
@@ -180,7 +179,7 @@ function renderBibleList(maxVerse) {
         const ori = loadedChapterData.original[i-1] || "";
         const commentContent = loadedChapterData.commentaries[i];
         
-        // 주해 내용 여부에 따른 클래스 지정
+        // 주해 내용 유무에 따른 클래스 지정
         const commIconClass = commentContent ? "material-icons left-icon-btn comm-icon has-content" : "material-icons left-icon-btn comm-icon";
 
         const korHtml = renderTextWithStrongs(korRaw, "kor");
@@ -192,7 +191,7 @@ function renderBibleList(maxVerse) {
                 <div class="verse-num">${i}.</div>
                 
                 <div class="left-icon-btn analysis-icon" title="원전 분해" 
-                     onclick="openAnalysisModal('${ori.replace(/'/g, "\\'")}')">
+                     onclick="openAnalysisModal('${currentBook}', ${currentChapter}, ${i})">
                      ${analysisIcon}
                 </div>
                 
@@ -227,16 +226,73 @@ function renderBibleList(maxVerse) {
     makeHebrewWordsClickable();
 }
 
-// [NEW] 주해 아이콘 클릭 핸들러
+// 주해 아이콘 클릭 핸들러
 function handleCommentaryClick(verseNum) {
-    selectVerse(verseNum); // 1. 절 선택
-    // 2. 모바일이면 주해창 강제 열기
+    selectVerse(verseNum); 
+    // 모바일이면 주해창 강제 열기
     if (window.innerWidth <= 768) {
         document.getElementById("commentary-area").classList.add("show");
     }
 }
 
-// 원어 단어 렌더링
+// [NEW] 원전 분해 모달 열기 및 데이터 로드
+async function openAnalysisModal(book, chapter, verse) {
+    const modal = document.getElementById("analysis-modal");
+    const body = document.getElementById("analysis-body");
+    
+    modal.style.display = "flex";
+    body.innerHTML = "<p>원전 데이터를 분석 중입니다...</p>";
+
+    try {
+        const res = await fetch(`${AHPI_API_BASE_URL}/analysis/${book}/${chapter}/${verse}`);
+        const data = await res.json();
+
+        if (data.error) {
+            body.innerHTML = `<p style="color:red;">오류: ${data.error}</p><p style="font-size:0.8rem; color:#666;">(api.py에서 테이블 이름을 확인하세요)</p>`;
+            return;
+        }
+
+        if (data.length === 0) {
+            body.innerHTML = "<p>분해 데이터가 없습니다.</p>";
+            return;
+        }
+
+        let tableHtml = `
+            <div class="analysis-meta">${KOREAN_BOOK_NAMES[book] || book} ${chapter}:${verse}</div>
+            <table class="analysis-table">
+                <thead>
+                    <tr>
+                        <th>원어</th>
+                        <th>발음</th>
+                        <th>분해(문법)</th>
+                        <th>의미</th>
+                        <th>코드</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        data.forEach(item => {
+            tableHtml += `
+                <tr>
+                    <td class="origin-font">${item.word}</td>
+                    <td>${item.pron}</td>
+                    <td style="color:#e83e8c;">${item.grammar}</td>
+                    <td>${item.meaning}</td>
+                    <td><span class="strong-tag" onclick="openLexiconModal('${item.code}', '${item.word}')">${item.code}</span></td>
+                </tr>
+            `;
+        });
+
+        tableHtml += `</tbody></table>`;
+        body.innerHTML = tableHtml;
+
+    } catch (err) {
+        console.error(err);
+        body.innerHTML = "<p style='color:red'>서버 통신 오류</p>";
+    }
+}
+
 function renderOriginalText(text) {
     const words = text.split(/\s+/).filter(w => w.length > 0);
     let html = "";
@@ -315,7 +371,7 @@ function updateNavUI() {
     if (isNT) { document.getElementById("btn-nt").classList.add("active"); document.getElementById("btn-ot").classList.remove("active"); } 
     else { document.getElementById("btn-ot").classList.add("active"); document.getElementById("btn-nt").classList.remove("active"); }
 }
-function openAnalysisModal(text) {
+function openAnalysisModalDummy(text) {
     const modal = document.getElementById("analysis-modal");
     const body = document.getElementById("analysis-body");
     modal.style.display = "flex";
@@ -399,7 +455,7 @@ async function saveCommentary() {
     loadedChapterData.commentaries[currentVerse] = content;
     selectVerse(currentVerse);
     
-    // [NEW] 주해 저장 후 아이콘 상태 업데이트 (파란색으로 변경)
+    // 주해 저장 후 아이콘 상태 업데이트
     const row = document.getElementById(`verse-row-${currentVerse}`);
     if (row) {
         const icon = row.querySelector('.comm-icon');

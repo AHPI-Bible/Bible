@@ -90,7 +90,7 @@ h1 { margin: 0; font-size: 1.5rem; line-height: 1.2; }
     z-index: 900;
 }
 
-/* [NEW] 안드로이드 패드 및 태블릿 모드 (60:40 비율 적용) */
+/* 태블릿 (안드로이드 패드) 모드 (60:40 비율) */
 @media (min-width: 769px) and (max-width: 1280px) {
     #bible-area {
         flex: 6; /* 60% */
@@ -151,13 +151,13 @@ h1 { margin: 0; font-size: 1.5rem; line-height: 1.2; }
 .verse-item:hover { background-color: #f9f9f9; }
 .verse-item.selected { background-color: #e8f0fe; }
 
-/* [NEW] 좌측 열 스타일 (세로 배치) */
+/* 좌측 열 스타일 (세로 배치) */
 .left-column {
     display: flex;
     flex-direction: column;
     align-items: center;
-    min-width: 40px; /* 너비 약간 확보 */
-    gap: 12px; /* 아이콘 간 간격 */
+    min-width: 40px; 
+    gap: 12px; 
     padding-top: 2px;
 }
 .verse-num { font-weight: bold; color: #007bff; font-size: 1.1rem; margin-bottom: 2px; }
@@ -165,7 +165,7 @@ h1 { margin: 0; font-size: 1.5rem; line-height: 1.2; }
 /* 공통 아이콘 스타일 */
 .left-icon-btn {
     cursor: pointer;
-    font-size: 1.2rem; /* 아이콘 크기 */
+    font-size: 1.2rem;
     color: #aaa;
     transition: 0.2s;
     padding: 4px;
@@ -188,7 +188,7 @@ h1 { margin: 0; font-size: 1.5rem; line-height: 1.2; }
 .analysis-icon:hover { color: #a71d2a; transform: scale(1.1); }
 
 /* 2. 주해 아이콘 */
-.comm-icon { color: #ccc; } /* 내용 없을 때 */
+.comm-icon { color: #ccc; } 
 .comm-icon.has-content { color: #007bff; } /* 내용 있을 때 파란색 */
 .comm-icon:hover { transform: scale(1.1); }
 
@@ -251,3 +251,56 @@ textarea { width: 100%; height: 300px; padding: 10px; border: 1px solid #ddd; bo
 
 .search-item { padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; }
 .search-item:hover { background: #f9f9f9; }
+
+/* 원전 분해 테이블 스타일 */
+.analysis-meta {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #007bff;
+}
+
+.analysis-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+}
+
+.analysis-table th, .analysis-table td {
+    padding: 10px;
+    border-bottom: 1px solid #ddd;
+    text-align: left;
+}
+
+.analysis-table th {
+    background-color: #f8f9fa;
+    font-weight: bold;
+    color: #555;
+    position: sticky;
+    top: 0;
+}
+
+.analysis-table tr:hover {
+    background-color: #f1f1f1;
+}
+
+.origin-font {
+    font-family: serif; 
+    font-size: 1.2rem;
+    font-weight: bold;
+}
+
+.strong-tag {
+    background-color: #e2e6ea;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    color: #0056b3;
+    cursor: pointer;
+}
+.strong-tag:hover {
+    background-color: #0056b3;
+    color: white;
+}
