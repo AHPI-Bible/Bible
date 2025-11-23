@@ -8,7 +8,7 @@ app = Flask(__name__)
 CORS(app)
 
 # ---------------------------------------------------
-# 1. 데이터 로드 (성경 + 사전)
+# 1. 데이터 로드 (성경 4종 + 사전 1종)
 # ---------------------------------------------------
 print("--- 서버 시작: 데이터 로드 중 ---")
 
@@ -17,7 +17,7 @@ english_map = {}
 greek_map = {}           
 hebrew_map = {}          
 bible_data_list = []     # 검색용
-lexicon_map = {}         # [NEW] 사전 데이터 (메모리 캐시용)
+lexicon_map = {}         # [NEW] 사전 데이터 (메모리 캐시)
 
 base_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -28,13 +28,13 @@ def load_csv_to_map(filename, target_map, is_korean=False, is_lexicon=False):
         return
     
     try:
-        # [수정] utf-8-sig를 사용하여 1절 깨짐 방지
+        # [중요] utf-8-sig : 윈도우/엑셀 CSV의 깨짐 방지
         with open(path, 'r', encoding='utf-8-sig') as f:
             reader = csv.DictReader(f)
             count = 0
             for row in reader:
                 if is_lexicon:
-                    # 사전 데이터 로드 (strong_code, content)
+                    # 사전 데이터 로드 (헤더: strong_code, content)
                     code = row.get('strong_code')
                     content = row.get('content')
                     if code and content:
@@ -61,15 +61,15 @@ def load_csv_to_map(filename, target_map, is_korean=False, is_lexicon=False):
     except Exception as e:
         print(f"❌ {filename} 로드 실패: {e}")
 
-# 파일 로드 실행
+# 파일 5개 모두 로드
 load_csv_to_map('korean_bible.csv', korean_map, is_korean=True)
 load_csv_to_map('english_bible.csv', english_map)
 load_csv_to_map('greek_bible.csv', greek_map)
 load_csv_to_map('hebrew_bible.csv', hebrew_map)
-load_csv_to_map('strong_lexicon.csv', lexicon_map, is_lexicon=True) # [NEW] 사전 로드
+load_csv_to_map('strong_lexicon.csv', lexicon_map, is_lexicon=True) # [NEW]
 
 # ---------------------------------------------------
-# 2. DB 연결
+# 2. DB 연결 (주해 저장용)
 # ---------------------------------------------------
 def get_db_connection():
     conn = psycopg2.connect(os.environ['DATABASE_URL'])
@@ -79,7 +79,6 @@ def init_db():
     try:
         conn = get_db_connection()
         cur = conn.cursor()
-        # 주석 테이블
         cur.execute("""
             CREATE TABLE IF NOT EXISTS commentaries (
                 id SERIAL PRIMARY KEY,
@@ -88,13 +87,6 @@ def init_db():
                 verse INT NOT NULL,
                 content TEXT,
                 UNIQUE(book, chapter, verse)
-            );
-        """)
-        # [NEW] 사전 테이블 (옵션: 메모리에 없으면 DB 사용)
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS lexicon (
-                code VARCHAR(20) PRIMARY KEY,
-                content TEXT
             );
         """)
         conn.commit()
@@ -149,14 +141,12 @@ def get_ahpi_chapter_data(book_name, chapter_num):
         'commentaries': commentaries
     })
 
-# [NEW] 사전 데이터 요청
+# [NEW] 사전 검색 API
 @app.route('/api/lexicon/<code>', methods=['GET'])
 def get_lexicon(code):
-    # 1. 메모리에서 먼저 찾음
+    # 메모리에 로드된 사전에서 찾기
     if code in lexicon_map:
         return jsonify({"code": code, "content": lexicon_map[code]})
-    
-    # 2. 없으면 DB에서 찾음 (확장성)
     return jsonify({"code": code, "content": "사전 데이터가 없습니다."})
 
 @app.route('/api/save_commentary', methods=['POST'])
