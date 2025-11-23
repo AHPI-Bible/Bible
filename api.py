@@ -108,26 +108,29 @@ def get_db_connection():
         return conn
     return None
 
+# api.py 파일의 init_db 함수 내부 (conn.commit() 전에 추가)
 def init_db():
     try:
         conn = get_db_connection()
         if conn:
             cur = conn.cursor()
+            # ... (commentaries 테이블 생성 로직) ...
+
+            # [수정] users 테이블 생성: 'role' 대신 'grade' INT 타입 사용
+# [NEW] 🔑 테스트 사용자 재추가 SQL 실행 (Grade 3 = Open 주해 권한)
             cur.execute("""
-                CREATE TABLE IF NOT EXISTS commentaries (
-                    id SERIAL PRIMARY KEY,
-                    book VARCHAR(50) NOT NULL,
-                    chapter INT NOT NULL,
-                    verse INT NOT NULL,
-                    content TEXT,
-                    UNIQUE(book, chapter, verse)
-                );
+                INSERT INTO users (username, password_hash, display_name, grade, is_verified)
+                VALUES ('test_member', '1234', 'AHPI 검증 회원', 3, TRUE)
+                ON CONFLICT (username) DO NOTHING;
             """)
+            print("✅ 테스트 사용자 'test_member' (Grade 3) 재추가 시도 완료")
+            
             conn.commit()
             cur.close()
             conn.close()
-            print("DB 초기화 완료")
+            print("DB 초기화 완료 및 users 테이블 추가")
     except Exception as e:
+        print(f"DB 초기화 오류 발생: {e}")
         pass
 
 with app.app_context():
@@ -172,7 +175,9 @@ def get_analysis_from_sdb(book, chapter, verse):
         return {"error": f"DB 쿼리 오류: {str(e)}"}
 
 @app.route('/api/get_chapter_data/<book_name>/<int:chapter_num>', methods=['GET'])
+# 수정할 함수: def get_ahpi_chapter_data(book_name, chapter_num):
 def get_ahpi_chapter_data(book_name, chapter_num):
+    # 성경 본문 로드 로직은 그대로 유지합니다. (생략)
     korean_verses = {}
     english_verses = {}
     greek_verses = {}
@@ -185,26 +190,42 @@ def get_ahpi_chapter_data(book_name, chapter_num):
         if key in greek_map: greek_verses[i] = greek_map[key]
         if key in hebrew_map: hebrew_verses[i] = hebrew_map[key]
 
-    commentaries = {}
+    # --- 주석 로드 로직 수정 시작 ---
+    ahpi_commentaries = {} # AHPI 공식 주해
+    open_commentaries = {} # Open 주해 (회원 작성)
+    
     try:
         conn = get_db_connection()
         if conn:
             cur = conn.cursor()
-            cur.execute("SELECT verse, content FROM commentaries WHERE book = %s AND chapter = %s", (book_name, chapter_num))
+            # commentary_type 필드를 추가하여 쿼리합니다.
+            cur.execute("SELECT verse, content, commentary_type FROM commentaries WHERE book = %s AND chapter = %s", (book_name, chapter_num))
             rows = cur.fetchall()
+            
             for row in rows:
-                commentaries[row[0]] = row[1]
+                verse, content, comment_type = row
+                
+                # 타입에 따라 주석을 분리하여 저장합니다.
+                if comment_type == 'ahpi':
+                    ahpi_commentaries[verse] = content
+                elif comment_type == 'open':
+                    open_commentaries[verse] = content
+                    
             cur.close()
             conn.close()
-    except:
+    except Exception as e:
+        print(f"주석 로드 오류: {e}")
         pass
+    # --- 주석 로드 로직 수정 끝 ---
 
+    # 최종 반환 데이터 구조를 변경합니다.
     return jsonify({
         'korean_verses': korean_verses,
         'english_verses': english_verses,
         'greek_verses': greek_verses,
         'hebrew_verses': hebrew_verses,
-        'commentaries': commentaries
+        'ahpi_commentaries': ahpi_commentaries,  # 새 데이터
+        'open_commentaries': open_commentaries # 새 데이터
     })
 
 @app.route('/api/lexicon/<code>', methods=['GET'])
@@ -218,26 +239,65 @@ def get_verse_analysis(book, chapter, verse):
     data = get_analysis_from_sdb(book, chapter, verse)
     return jsonify(data)
 
+# [수정] save_commentary 함수
+
 @app.route('/api/save_commentary', methods=['POST'])
 def save_commentary():
     data = request.json
+    book = data.get('book')
+    chapter = data.get('chapter')
+    verse = data.get('verse')
+    content = data.get('content')
+    commentary_type = data.get('commentary_type', 'open')
+    user_id = data.get('user_id') # 프론트엔드에서 보낸 user_id 추출
+    
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({"error": "데이터베이스 연결 오류"}), 500
+
     try:
-        conn = get_db_connection()
-        if conn:
-            cur = conn.cursor()
-            cur.execute("""
-                INSERT INTO commentaries (book, chapter, verse, content)
-                VALUES (%s, %s, %s, %s)
-                ON CONFLICT (book, chapter, verse) 
-                DO UPDATE SET content = EXCLUDED.content;
-            """, (data['book'], data['chapter'], data['verse'], data['content']))
-            conn.commit()
+        cur = conn.cursor()
+        
+        # --- [NEW] 서버 측 권한 검증 로직 ---
+        if not user_id:
             cur.close()
             conn.close()
-            return jsonify({"message": "저장 성공"}), 200
-        else:
-             return jsonify({"error": "DB 연결 불가"}), 500
+            return jsonify({"error": "인증 정보(user_id)가 없습니다. 로그인해주세요."}), 401
+        
+        # 1. user_id로 사용자의 grade를 조회합니다.
+        cur.execute("SELECT grade FROM users WHERE id = %s", (user_id,))
+        user_grade_row = cur.fetchone()
+        
+        if not user_grade_row:
+            cur.close()
+            conn.close()
+            return jsonify({"error": "유효하지 않은 사용자 정보입니다."}), 403
+            
+        user_grade = user_grade_row[0]
+        
+        # 2. Grade 3 미만은 Open 주해 작성 불가 (Open 주해의 권한 기준: 3)
+        if commentary_type == 'open' and user_grade < 3:
+            cur.close()
+            conn.close()
+            return jsonify({"error": f"권한 부족 (현재 Grade: {user_grade}). Open 주해는 Grade 3 이상만 작성 가능합니다."}), 403
+
+        # ------------------------------------
+        
+        # 권한 확인 후 저장 로직 실행
+        cur.execute("""
+            INSERT INTO commentaries (book, chapter, verse, content, commentary_type)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (book, chapter, verse, commentary_type) 
+            DO UPDATE SET content = EXCLUDED.content;
+        """, (book, chapter, verse, content, commentary_type))
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({"message": "저장 성공"}), 200
+        
     except Exception as e:
+        print(f"저장 중 서버 오류 발생: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/search', methods=['GET'])
@@ -258,3 +318,53 @@ def search_bible():
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
+
+# api.py 파일의 가장 아래 (if __name__ == '__main__': 위에 추가)
+
+# [NEW] 로그인 엔드포인트 구현
+@app.route('/api/login', methods=['POST'])
+def login():
+    data = request.json
+    username = data.get('username')
+    password = data.get('password') # 실제 구현에서는 비밀번호 해시(hash)를 받아야 합니다.
+    
+    if not username or not password:
+        return jsonify({"message": "사용자 이름과 비밀번호를 입력해주세요."}), 400
+
+    conn = get_db_connection()
+    if conn:
+        try:
+            cur = conn.cursor()
+            
+            # [수정] SQL: role 대신 grade를 조회합니다.
+            cur.execute("SELECT id, password_hash, grade, display_name FROM users WHERE username = %s AND is_verified = TRUE", (username,))
+            user = cur.fetchone()
+            cur.close()
+            conn.close()
+
+            if user:
+                # [수정] grade 변수 사용
+                user_id, stored_hash, grade, display_name = user 
+                
+                # 2. 비밀번호 확인 (⚠️ 주의: 실제 서비스에서는 안전한 비밀번호 해시 비교 로직을 사용해야 합니다.)
+                if password == stored_hash: 
+                    # 로그인 성공
+                    return jsonify({
+                        "message": "로그인 성공",
+                        "user_id": user_id,
+                        "username": username,
+                        "display_name": display_name,
+                        "grade": grade, # grade 값 반환 (1~5)
+                        "is_authenticated": True
+                    }), 200
+                else:
+                    # 비밀번호 불일치
+                    return jsonify({"message": "비밀번호가 일치하지 않습니다."}), 401
+            else:
+                # 사용자 이름이 없거나 검증되지 않음
+                return jsonify({"message": "사용자를 찾을 수 없거나 검증되지 않은 계정입니다."}), 401
+                
+        except Exception as e:
+            return jsonify({"error": f"로그인 서버 오류: {str(e)}"}), 500
+    else:
+        return jsonify({"error": "데이터베이스 연결 오류"}), 500

@@ -1,3 +1,4 @@
+/* --- CSS 변수 정의 (최상단) --- */
 :root {
     --bg-color: #f4f4f4;
     --card-bg: #fff;
@@ -10,8 +11,20 @@
     --hover-bg: #f9f9f9;
     --selected-bg: #e8f0fe;
     --modal-bg: rgba(0,0,0,0.5);
+    
+    /* [NEW] 주석 관련 변수 */
+    --ahpi-official-bg: #f3f0f7;
+    --ahpi-official-border: #4a3875;
+    --open-comm-bg: #f7fcfc;
+    --open-comm-border: #1f7b88;
+
+    /* main-bg-color와 content-bg-color 정의 (기존 코드에서 사용됨) */
+    --main-bg-color: var(--bg-color);
+    --content-bg-color: var(--card-bg);
+    --input-bg-color: var(--card-bg);
 }
 
+/* --- 다크 모드 변수 재정의 --- */
 body.dark-mode {
     --bg-color: #121212;
     --card-bg: #1e1e1e;
@@ -24,8 +37,19 @@ body.dark-mode {
     --hover-bg: #2a2a2a;
     --selected-bg: #1a3a5a;
     --modal-bg: rgba(255,255,255,0.1);
+    
+    /* [NEW] 다크 모드 주석 관련 변수 재정의 */
+    --ahpi-official-bg: #2b253b;
+    --ahpi-official-border: #7d68a9;
+    --open-comm-bg: #1e3a47;
+    --open-comm-border: #4da6b7;
+
+    --main-bg-color: var(--bg-color);
+    --content-bg-color: var(--card-bg);
+    --input-bg-color: #333; /* 다크모드 입력창 배경 */
 }
 
+/* --- 기본 레이아웃 및 헤더 --- */
 body {
     font-family: "Apple SD Gothic Neo", "Malgun Gothic", "Dotum", sans-serif;
     line-height: 1.6;
@@ -64,6 +88,7 @@ h1 { margin: 0; font-size: 1.5rem; line-height: 1.2; }
 }
 .header-settings-btn:hover { color: var(--primary-color); }
 
+/* --- 네비게이션 및 컨트롤 --- */
 .nav-container {
     background-color: var(--card-bg);
     padding: 10px 15px;
@@ -118,6 +143,7 @@ h1 { margin: 0; font-size: 1.5rem; line-height: 1.2; }
 #search-input { padding: 6px; border: 1px solid var(--border-color); border-radius: 4px; width: 120px; background: var(--card-bg); color: var(--text-color); }
 #search-lang { padding: 6px; border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer; background: var(--card-bg); color: var(--text-color); }
 
+/* --- 메인 콘텐츠 및 패널 --- */
 .container { display: flex; flex: 1; margin: 0; overflow: hidden; position: relative; }
 #bible-area { 
     flex: 1; background: var(--card-bg); display: flex; flex-direction: column; border-right: 1px solid var(--border-color); 
@@ -147,16 +173,7 @@ h1 { margin: 0; font-size: 1.5rem; line-height: 1.2; }
     display: flex; flex-direction: column; flex-shrink: 0; transition: transform 0.3s ease, width 0.3s ease, flex 0.3s ease; z-index: 900;
 }
 
-/* [수정] 레이아웃 비율 - 미디어 쿼리 제거하여 모바일도 적용 (단, Flex row 조건 필요) */
-/* 기본적으로 모바일은 flex-direction: column이 아니므로(html 구조상 row), % 너비가 먹힘. 
-   하지만 모바일에서는 보통 패널을 덮어씌우므로, 
-   화면 너비가 충분히 클 때만 분할 레이아웃을 적용하고, 작으면 무시하거나 패널 방식으로 처리.
-   사용자 요청: "폰과 패드에서도 되게 하라". 
-   패드(Tablet)는 분할이 의미가 있지만, 폰(좁은 화면)에서 5:5는 텍스트가 깨짐.
-   그러나 요청대로 전역으로 적용하되, 모바일 전용 스타일에서 덮어씀. 
-*/
-
-/* 전역 레이아웃 비율 클래스 */
+/* --- 레이아웃 비율 클래스 --- */
 body.layout-40-60 #bible-area { flex: 4; }
 body.layout-40-60 #commentary-area { width: 60%; display: flex; }
 
@@ -183,7 +200,7 @@ body.layout-100-0 #commentary-area { display: none; }
 }
 .scrollable-content { flex: 1; overflow-y: auto; padding: 15px; }
 
-/* 모바일 전용 스타일 (화면 너비 768px 이하) */
+/* --- 모바일 전용 스타일 (화면 너비 768px 이하) --- */
 .mobile-only { display: none; }
 @media (max-width: 768px) {
     .mobile-only { display: inline-block; }
@@ -210,6 +227,7 @@ body.layout-100-0 #commentary-area { display: none; }
     #bible-area { padding-top: 40px; }
 }
 
+/* --- 성경 본문 및 아이콘 --- */
 .verse-item { padding: 15px; border-bottom: 1px solid var(--border-color); display: flex; gap: 12px; }
 .verse-item:hover { background-color: var(--hover-bg); }
 .verse-item.selected { background-color: var(--selected-bg); }
@@ -245,13 +263,22 @@ body.layout-100-0 #commentary-area { display: none; }
 .strong-word { cursor: pointer; color: var(--primary-color); text-decoration: none; }
 .strong-word:hover { background-color: var(--hover-bg); color: #003d82; text-decoration: underline; text-decoration-style: dotted; }
 
-#commentary-display { white-space: pre-wrap; line-height: 1.8; font-size: 1.1rem; min-height: 100px; color: var(--text-color); }
-textarea { width: 100%; height: 300px; padding: 10px; border: 1px solid var(--border-color); border-radius: 4px; resize: vertical; font-family: sans-serif; box-sizing: border-box; margin-bottom: 10px; background: var(--bg-color); color: var(--text-color); }
+/* --- 주해 편집기 및 콘텐츠 --- */
+#commentary-display { 
+    padding: 15px;
+    line-height: 1.65;
+    background: var(--content-bg-color); /* main-bg-color에서 content-bg-color로 수정 */
+    min-height: 200px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+textarea { width: 100%; height: 300px; padding: 10px; border: 1px solid var(--border-color); border-radius: 4px; resize: vertical; font-family: sans-serif; box-sizing: border-box; margin-bottom: 10px; background: var(--input-bg-color); color: var(--text-color); } /* [수정] background 변수 사용 */
 .action-btn { width: 100%; padding: 10px; background: #333; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 10px; }
 .btn-group { display: flex; gap: 10px; }
 .save-btn { flex: 1; background: #28a745; padding: 10px; color: white; border: none; border-radius: 4px; cursor: pointer; }
 .cancel-btn { flex: 1; background: #dc3545; padding: 10px; color: white; border: none; border-radius: 4px; cursor: pointer; }
 
+/* --- 기존 모달 및 오버레이 --- */
 .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--modal-bg); display: flex; justify-content: center; align-items: center; z-index: 2000; }
 .modal-content { background: var(--card-bg); padding: 20px; border-radius: 8px; width: 90%; max-width: 600px; max-height: 80vh; overflow-y: auto; position: relative; color: var(--text-color); }
 .large-modal { max-width: 800px; }
@@ -264,9 +291,55 @@ textarea { width: 100%; height: 300px; padding: 10px; border: 1px solid var(--bo
 }
 
 .close-btn { position: absolute; top: 10px; right: 15px; font-size: 24px; cursor: pointer; color: var(--text-sub); }
-.sticky-close { position: sticky; top: 0; float: right; background: var(--card-bg); border-radius: 50%; padding: 2px 8px; z-index: 100; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+.sticky-close { position: sticky; top: 0; float: right; background: var(--card-bg); border-radius: 50%; padding: 2px 8px; z-index: 100; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); }
 .close-btn:hover { color: var(--text-color); }
 
+/* --- [NEW] 로그인 모달 스타일 추가 --- */
+.modal {
+    display: none; /* 기본적으로 숨김 */
+    position: fixed;
+    z-index: 3000; /* 가장 위에 표시 */
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: var(--modal-bg); /* 변수 사용 */
+    display: flex; /* Flexbox로 중앙 정렬 */
+    justify-content: center;
+    align-items: center;
+}
+.modal-content {
+    background-color: var(--card-bg);
+    margin: auto;
+    padding: 30px;
+    border: 1px solid var(--border-color);
+    width: 80%;
+    max-width: 600px;
+    border-radius: 10px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    position: relative;
+    color: var(--text-color);
+}
+.input-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+}
+.input-group input {
+    width: 95%;
+    padding: 10px;
+    margin-bottom: 15px;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    background-color: var(--input-bg-color);
+    color: var(--text-color);
+}
+/* 다크 모드에서의 모달 보더 */
+body.dark-mode .modal-content {
+    border: 1px solid #3a3a3a;
+}
+/* --- 검색, 분석, 사전 등 기타 요소 --- */
 .search-item { padding: 15px; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: 0.2s; }
 .search-item:hover { background: var(--hover-bg); transform: translateX(5px); }
 .search-ref { font-weight: bold; color: var(--primary-color); font-size: 0.9rem; margin-bottom: 5px; }
@@ -308,3 +381,35 @@ mark { background-color: #ffeeba; color: #333; padding: 0 2px; border-radius: 2p
 .grid-btn.selected { background: var(--primary-color); color: white; border-color: var(--primary-color); }
 .toast { visibility: visible; min-width: 200px; background-color: #333; color: #fff; text-align: center; border-radius: 4px; padding: 10px; position: fixed; z-index: 3000; left: 50%; bottom: 30px; transform: translateX(-50%); opacity: 1; transition: opacity 0.5s, bottom 0.5s; }
 .toast.hidden { visibility: hidden; opacity: 0; bottom: 0; }
+
+/* --- 주석 영역 스타일 (기존 코드) --- */
+/* (주석 관련 스타일은 변경 없이 유지되며, 위에서 변수 정의를 통합했습니다.) */
+.commentary-box {
+    margin-bottom: 25px;
+    padding: 15px;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+.commentary-box h4 {
+    font-weight: 700;
+    font-size: 1.1em;
+    padding-bottom: 5px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+.commentary-box p {
+    margin: 0;
+    padding-top: 5px;
+}
+.ahpi-commentary {
+    background: var(--ahpi-official-bg); 
+    border: 2px solid var(--ahpi-official-border);
+    box-shadow: 0 4px 8px rgba(74, 56, 117, 0.15);
+}
+body.dark-mode .ahpi-commentary {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+.open-commentary {
+    background: var(--open-comm-bg);
+    border: 1px dashed var(--open-comm-border);
+    opacity: 0.9;
+}
