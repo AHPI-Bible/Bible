@@ -1,85 +1,240 @@
 /* 기본 설정 */
-body { font-family: "Apple SD Gothic Neo", "Malgun Gothic", "Dotum", sans-serif; line-height: 1.6; margin: 0; background-color: #f4f4f4; height: 100vh; display: flex; flex-direction: column; }
-header { background: #333; color: #fff; padding: 1.5rem 1rem; flex-shrink: 0; }
-.header-content { display: flex; justify-content: center; align-items: baseline; gap: 15px; flex-wrap: wrap; }
-h1 { margin: 0; font-size: 1.8rem; line-height: 1.2; }
-.sub-title { font-size: 1.1rem; color: #ccc; font-weight: normal; letter-spacing: 1px; }
+body {
+    font-family: "Apple SD Gothic Neo", "Malgun Gothic", "Dotum", sans-serif;
+    line-height: 1.6;
+    margin: 0;
+    background-color: #f4f4f4;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+header {
+    background: #333;
+    color: #fff;
+    padding: 1rem;
+    flex-shrink: 0;
+}
+.header-content {
+    display: flex;
+    justify-content: center;
+    align-items: baseline;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+h1 { margin: 0; font-size: 1.5rem; line-height: 1.2; }
+.sub-title { font-size: 0.9rem; color: #ccc; font-weight: normal; letter-spacing: 1px; }
 
-/* 내비게이션 */
-.nav-container { background-color: #fff; padding: 10px 15px; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
-.nav-left-group { display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
+/* 내비게이션 바 */
+.nav-container {
+    background-color: #fff;
+    padding: 10px 15px;
+    border-bottom: 1px solid #ddd;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    flex-shrink: 0;
+}
+.nav-left-group { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.nav-right-group { display: flex; align-items: center; gap: 10px; margin-left: auto; }
 .history-group, .book-group, .move-group { display: flex; align-items: center; gap: 5px; }
-.nav-trigger { background: #f8f9fa; border: 1px solid #ccc; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 1rem; font-weight: bold; color: #333; min-width: 60px; }
+
+.nav-trigger {
+    background: #f8f9fa; border: 1px solid #ccc; padding: 6px 12px; border-radius: 4px;
+    cursor: pointer; font-size: 0.9rem; font-weight: bold; color: #333; min-width: 60px;
+}
 .nav-trigger:hover { background: #e2e6ea; }
 .nav-trigger.active { border: 2px solid #007bff; color: #007bff; background: #fff; }
+
 .location-text { font-weight: bold; margin: 0 5px; color: #007bff; font-size: 1.1rem; white-space: nowrap;}
-.nav-btn { background: #6c757d; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.9rem; }
+
+.nav-btn {
+    background: #6c757d; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.9rem;
+}
 #search-btn { background: #17a2b8; }
+
+/* 검색창 */
 .search-box { display: flex; gap: 5px; align-items: center;}
-#search-input { padding: 6px; border: 1px solid #ccc; border-radius: 4px; width: 150px; }
+#search-input { padding: 6px; border: 1px solid #ccc; border-radius: 4px; width: 120px; }
 #search-lang { padding: 6px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; }
 
 /* 메인 레이아웃 */
-.container { display: flex; flex: 1; margin: 10px; gap: 15px; overflow: hidden; }
-#bible-area, #commentary-area { background: #fff; border-radius: 5px; display: flex; flex-direction: column; border: 1px solid #ddd; }
-#bible-area { flex: 3; }
-#commentary-area { flex: 2; }
-.panel-header { padding: 10px; background: #f1f1f1; border-bottom: 1px solid #ddd; font-weight: bold; color: #555; }
+.container {
+    display: flex;
+    flex: 1;
+    margin: 0; /* 여백 제거하여 공간 확보 */
+    overflow: hidden;
+    position: relative;
+}
+
+#bible-area {
+    flex: 1;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid #ddd;
+    overflow-y: auto;
+    padding-top: 10px;
+}
+
+/* 주해 영역 (PC 기본: 우측 고정) */
+#commentary-area {
+    width: 400px; /* 고정 너비 */
+    background: #fdfdfd;
+    border-left: 1px solid #ddd;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    transition: transform 0.3s ease; /* 슬라이드 애니메이션 */
+    z-index: 900;
+}
+
+.panel-header {
+    padding: 10px 15px;
+    background: #f1f1f1;
+    border-bottom: 1px solid #ddd;
+    font-weight: bold;
+    color: #555;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
 .scrollable-content { flex: 1; overflow-y: auto; padding: 15px; }
 
-/* 성경 본문 */
-.verse-item { padding: 15px; border-bottom: 1px solid #eee; cursor: pointer; transition: background-color 0.2s; }
+/* [NEW] 모바일 전용 스타일 */
+.mobile-only { display: none; }
+
+@media (max-width: 768px) {
+    .mobile-only { display: inline-block; }
+    
+    /* 모바일에서는 주해창을 화면 오른쪽 밖으로 숨김 */
+    #commentary-area {
+        position: absolute;
+        top: 0; right: 0; bottom: 0;
+        width: 90%;
+        max-width: 400px;
+        box-shadow: -5px 0 15px rgba(0,0,0,0.3);
+        transform: translateX(100%); 
+        background-color: #fff;
+    }
+    /* 활성화 클래스 (자바스크립트로 토글) */
+    #commentary-area.show {
+        transform: translateX(0);
+    }
+    
+    /* 모바일 폰트 조정 */
+    .korean-text { font-size: 1.1rem !important; }
+    .hebrew-text { font-size: 1.3rem !important; }
+    .nav-left-group { gap: 5px; }
+    .location-text { font-size: 1rem; }
+}
+
+/* 성경 본문 리스트 아이템 */
+.verse-item {
+    padding: 15px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    gap: 12px; /* 좌우 열 간격 */
+}
 .verse-item:hover { background-color: #f9f9f9; }
-.verse-item.selected { background-color: #e8f0fe; border-left: 5px solid #007bff; }
+.verse-item.selected { background-color: #e8f0fe; }
 
-.verse-line { margin-bottom: 6px; display: flex; align-items: center; gap: 5px; }
-.verse-num { font-weight: bold; color: #007bff; font-size: 1.1rem; min-width: 25px; }
-.korean-text { font-size: 1.2rem; color: #333; font-weight: 500; }
-.english-text { font-size: 0.95rem; color: #666; font-family: serif; margin-left: 30px; }
-.hebrew-text { font-size: 1.4rem; color: #000; font-family: serif; direction: rtl; text-align: right; flex: 1; }
-.greek-text { font-size: 1.2rem; color: #000; font-family: serif; flex: 1;}
-
-/* [수정됨] 스트롱 코드 링크 (밑줄 제거) */
-.strong-word { 
-    cursor: pointer; color: #0056b3; 
-    text-decoration: none; /* 밑줄 제거 */
+/* [NEW] 좌측 열 (숫자 + 원전분해 아이콘) */
+.left-column {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 30px;
+    gap: 8px;
+    padding-top: 2px;
 }
-.strong-word:hover { background-color: #e2e6ea; color: #003d82; }
-.hebrew-word { cursor: pointer; } 
-.hebrew-word:hover { color: blue; text-decoration: none; }
-
-/* 아이콘 */
-.action-icon { cursor: pointer; font-size: 1rem; color: #aaa; opacity: 0.7; transition: all 0.2s; }
-.action-icon:hover { color: #007bff; opacity: 1; transform: scale(1.1); }
-.analysis-icon { cursor: pointer; font-size: 1.1rem; color: #dc3545; font-weight: bold; padding: 0 5px;}
-.analysis-icon:hover { color: #a71d2a; }
-
-/* [NEW] 토스트 메시지 (복사 알림) */
-.toast {
-    visibility: visible; min-width: 200px; background-color: #333; color: #fff;
-    text-align: center; border-radius: 4px; padding: 10px; position: fixed; z-index: 3000;
-    left: 50%; bottom: 30px; transform: translateX(-50%);
-    opacity: 1; transition: opacity 0.5s, bottom 0.5s;
+.verse-num { font-weight: bold; color: #007bff; font-size: 1.1rem; }
+/* 원전분해 아이콘 */
+.analysis-icon {
+    cursor: pointer;
+    font-size: 1.2rem;
+    color: #dc3545;
+    font-weight: bold;
+    opacity: 0.6;
+    transition: 0.2s;
+    padding: 5px;
+    border: 1px solid transparent;
+    border-radius: 4px;
 }
-.toast.hidden { visibility: hidden; opacity: 0; bottom: 0; }
+.analysis-icon:hover {
+    opacity: 1;
+    transform: scale(1.1);
+    color: #a71d2a;
+    background-color: #ffeef0;
+    border-color: #f5c6cb;
+}
 
-/* 에디터 & 팝업 (기존 유지) */
+/* [NEW] 우측 열 (본문 텍스트) */
+.text-column { flex: 1; }
+.verse-line {
+    margin-bottom: 6px;
+    position: relative;
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.korean-text { font-size: 1.25rem; color: #333; font-weight: 500; line-height: 1.5; }
+.english-text { display: block; font-size: 1rem; color: #666; font-family: serif; margin-top: 2px; width: 100%; }
+.hebrew-text { display: block; font-size: 1.5rem; color: #000; font-family: serif; direction: rtl; margin-top: 8px; width: 100%; text-align: right;}
+.greek-text { display: block; font-size: 1.3rem; color: #000; font-family: serif; margin-top: 5px; width: 100%; }
+
+/* [NEW] 통합 복사 아이콘 */
+.copy-icon {
+    cursor: pointer;
+    color: #bbb;
+    font-size: 1.2rem;
+    margin-left: 8px;
+    vertical-align: middle;
+    transition: color 0.2s;
+}
+.copy-icon:hover { color: #28a745; }
+
+/* 단어 스타일 */
+.hebrew-word { cursor: pointer; }
+.hebrew-word:hover { color: blue; text-decoration: underline; }
+.strong-word { cursor: pointer; color: #0056b3; text-decoration: none; }
+.strong-word:hover { background-color: #e2e6ea; color: #003d82; text-decoration: underline; text-decoration-style: dotted; }
+
+/* 에디터 & 버튼 */
 #commentary-display { white-space: pre-wrap; line-height: 1.8; font-size: 1.1rem; min-height: 100px; }
 textarea { width: 100%; height: 300px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; resize: vertical; font-family: sans-serif; box-sizing: border-box; margin-bottom: 10px; }
 .action-btn { width: 100%; padding: 10px; background: #333; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 10px; }
 .btn-group { display: flex; gap: 10px; }
 .save-btn { flex: 1; background: #28a745; padding: 10px; color: white; border: none; border-radius: 4px; cursor: pointer; }
 .cancel-btn { flex: 1; background: #dc3545; padding: 10px; color: white; border: none; border-radius: 4px; cursor: pointer; }
+
+/* 팝업 공통 */
 .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 2000; }
 .modal-content { background: #fff; padding: 20px; border-radius: 8px; width: 90%; max-width: 600px; max-height: 80vh; overflow-y: auto; position: relative; }
 .large-modal { max-width: 800px; }
 .small-modal { max-width: 350px; }
 .close-btn { position: absolute; top: 10px; right: 15px; font-size: 24px; cursor: pointer; color: #aaa; }
 .close-btn:hover { color: #000; }
+.close-icon { cursor: pointer; font-size: 24px; color: #555; }
+
+/* [NEW] 복사 옵션 버튼 */
+.copy-options { display: flex; flex-direction: column; gap: 10px; }
+.copy-btn { padding: 15px; background: #f8f9fa; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; font-size: 1.1rem; text-align: left; transition: 0.2s; }
+.copy-btn:hover { background: #e2e6ea; border-color: #007bff; color: #007bff; }
+
+/* 그리드 */
 .grid-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; margin-top: 15px; }
 .number-grid { grid-template-columns: repeat(auto-fill, minmax(50px, 1fr)); }
 .grid-btn { padding: 12px 5px; background: #f8f9fa; border: 1px solid #ddd; border-radius: 5px; text-align: center; cursor: pointer; font-size: 1rem; }
 .grid-btn:hover { background: #e2e6ea; border-color: #adb5bd; }
 .grid-btn.selected { background: #007bff; color: white; border-color: #007bff; }
+
+/* 토스트 */
+.toast { visibility: visible; min-width: 200px; background-color: #333; color: #fff; text-align: center; border-radius: 4px; padding: 10px; position: fixed; z-index: 3000; left: 50%; bottom: 30px; transform: translateX(-50%); opacity: 1; transition: opacity 0.5s, bottom 0.5s; }
+.toast.hidden { visibility: hidden; opacity: 0; bottom: 0; }
+
 .search-item { padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; }
 .search-item:hover { background: #f9f9f9; }
