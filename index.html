@@ -30,9 +30,13 @@
             <span class="sub-title">AHP Bible Project</span>
         </div>
 
-        <button id="btn-settings" class="icon-btn header-settings-btn" title="설정">
-            <span class="material-icons">settings</span>
-        </button>
+        <div class="header-right" style="display:flex; align-items:center; gap:10px;">
+            <button id="header-login-btn" class="nav-btn" style="font-size:0.9rem;">로그인</button>
+            
+            <button id="btn-settings" class="icon-btn header-settings-btn" title="설정">
+                <span class="material-icons">settings</span>
+            </button>
+        </div>
     </header>
 
     <div class="nav-container">
@@ -106,9 +110,13 @@
             </div>
             <div id="commentary-content-wrapper" class="scrollable-content">
                 <div id="commentary-display">절을 선택하면 주해가 표시됩니다.</div>
-                <button id="edit-btn" class="action-btn">주해 작성 / 수정</button>
+                
+                <button id="edit-btn" class="action-btn" style="display:none;">주해 작성 / 수정</button>
+                
                 <div id="editor-container" style="display: none;">
-                    <textarea id="commentary-input" placeholder="여기에 주해를 작성하세요..."></textarea>
+                    <div id="editor-mode-select" style="margin-bottom: 10px; display: flex; gap: 5px;"></div>
+
+                    <textarea id="commentary-input" rows="10" placeholder="주해 내용을 입력하세요..."></textarea>
                     <div class="btn-group">
                         <button id="save-btn" class="save-btn">저장</button>
                         <button id="cancel-btn" class="cancel-btn">취소</button>
@@ -117,6 +125,29 @@
             </div>
         </aside>
     </main>
+
+    <div id="login-modal" class="modal" style="display: none;">
+        <div class="modal-content small-modal">
+            <span class="close" id="login-modal-close">&times;</span>
+            <h2 style="color: #4a3875; margin-bottom: 20px;">AHPI 회원 로그인</h2>
+
+            <div class="input-group">
+                <label for="login-username">사용자 이름</label>
+                <input type="text" id="login-username" placeholder="test_member" required>
+            </div>
+            
+            <div class="input-group">
+                <label for="login-password">비밀번호</label>
+                <input type="password" id="login-password" placeholder="1234" required>
+            </div>
+            
+            <p id="login-message" style="color: red; margin-top: 10px; font-size: 0.9em;"></p>
+            
+            <button id="login-submit-btn" class="main-btn" style="width: 100%; margin-top: 15px; padding: 10px; background-color: #4a3875; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                로그인
+            </button>
+        </div>
+    </div>
 
     <div id="copy-modal" class="modal-overlay" style="display: none; justify-content: flex-end;">
         <div class="modal-content medium-modal right-aligned-modal">
@@ -128,29 +159,22 @@
                     <span style="width:10px;"></span>
                     <span class="label-text">끝</span>
                 </div>
-
                 <div class="copy-row">
                     <button class="copy-btn-small" id="copy-kor">한글 한 절 복사</button>
                     <div class="range-selector">
-                        <select id="kor-start" class="verse-select"></select>
-                        <span>~</span>
-                        <select id="kor-end" class="verse-select"></select>
+                        <select id="kor-start" class="verse-select"></select><span>~</span><select id="kor-end" class="verse-select"></select>
                     </div>
                 </div>
                 <div class="copy-row">
                     <button class="copy-btn-small" id="copy-eng">영어 한 절 복사</button>
                     <div class="range-selector">
-                        <select id="eng-start" class="verse-select"></select>
-                        <span>~</span>
-                        <select id="eng-end" class="verse-select"></select>
+                        <select id="eng-start" class="verse-select"></select><span>~</span><select id="eng-end" class="verse-select"></select>
                     </div>
                 </div>
                 <div class="copy-row">
                     <button class="copy-btn-small" id="copy-ori">원어 한 절 복사</button>
                     <div class="range-selector">
-                        <select id="ori-start" class="verse-select"></select>
-                        <span>~</span>
-                        <select id="ori-end" class="verse-select"></select>
+                        <select id="ori-start" class="verse-select"></select><span>~</span><select id="ori-end" class="verse-select"></select>
                     </div>
                 </div>
             </div>
