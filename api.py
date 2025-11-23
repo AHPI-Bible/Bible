@@ -7,17 +7,14 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)
 
-# ---------------------------------------------------
-# 1. 데이터 로드 (성경 4종 + 사전 1종)
-# ---------------------------------------------------
 print("--- 서버 시작: 데이터 로드 중 ---")
 
 korean_map = {}          
 english_map = {}         
 greek_map = {}           
 hebrew_map = {}          
-bible_data_list = []     # 검색용
-lexicon_map = {}         # [NEW] 사전 데이터 (메모리 캐시)
+bible_data_list = []     
+lexicon_map = {}         
 
 base_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -28,20 +25,23 @@ def load_csv_to_map(filename, target_map, is_korean=False, is_lexicon=False):
         return
     
     try:
-        # [중요] utf-8-sig : 윈도우/엑셀 CSV의 깨짐 방지
+        # [핵심 수정] utf-8-sig : 1절이 안 보이는 문제(BOM) 해결
         with open(path, 'r', encoding='utf-8-sig') as f:
             reader = csv.DictReader(f)
+            
+            # 헤더 공백 제거 (안전장치)
+            if reader.fieldnames:
+                reader.fieldnames = [name.strip() for name in reader.fieldnames]
+
             count = 0
             for row in reader:
                 if is_lexicon:
-                    # 사전 데이터 로드 (헤더: strong_code, content)
                     code = row.get('strong_code')
                     content = row.get('content')
                     if code and content:
                         target_map[code] = content
                         count += 1
                 else:
-                    # 성경 데이터 로드
                     b = row.get('book_name') or row.get('book')
                     c = row.get('chapter_num') or row.get('chapter')
                     v = row.get('verse_num') or row.get('verse')
@@ -61,16 +61,12 @@ def load_csv_to_map(filename, target_map, is_korean=False, is_lexicon=False):
     except Exception as e:
         print(f"❌ {filename} 로드 실패: {e}")
 
-# 파일 5개 모두 로드
 load_csv_to_map('korean_bible.csv', korean_map, is_korean=True)
 load_csv_to_map('english_bible.csv', english_map)
 load_csv_to_map('greek_bible.csv', greek_map)
 load_csv_to_map('hebrew_bible.csv', hebrew_map)
-load_csv_to_map('strong_lexicon.csv', lexicon_map, is_lexicon=True) # [NEW]
+load_csv_to_map('strong_lexicon.csv', lexicon_map, is_lexicon=True)
 
-# ---------------------------------------------------
-# 2. DB 연결 (주해 저장용)
-# ---------------------------------------------------
 def get_db_connection():
     conn = psycopg2.connect(os.environ['DATABASE_URL'])
     return conn
@@ -98,10 +94,6 @@ def init_db():
 
 with app.app_context():
     init_db()
-
-# ---------------------------------------------------
-# 3. API 라우트
-# ---------------------------------------------------
 
 @app.route('/api/get_chapter_data/<book_name>/<int:chapter_num>', methods=['GET'])
 def get_ahpi_chapter_data(book_name, chapter_num):
@@ -141,10 +133,8 @@ def get_ahpi_chapter_data(book_name, chapter_num):
         'commentaries': commentaries
     })
 
-# [NEW] 사전 검색 API
 @app.route('/api/lexicon/<code>', methods=['GET'])
 def get_lexicon(code):
-    # 메모리에 로드된 사전에서 찾기
     if code in lexicon_map:
         return jsonify({"code": code, "content": lexicon_map[code]})
     return jsonify({"code": code, "content": "사전 데이터가 없습니다."})
