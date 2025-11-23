@@ -22,7 +22,7 @@ search_index = { 'kor': [], 'eng': [], 'heb': [], 'grk': [] }
 
 base_dir = os.path.dirname(os.path.abspath(__file__))
 
-# [NEW] 책 이름 -> 숫자 ID 매핑 (DB 조회용)
+# 책 이름 -> 숫자 ID 매핑
 BOOK_TO_ID = {
     "Genesis": 1, "Exodus": 2, "Leviticus": 3, "Numbers": 4, "Deuteronomy": 5,
     "Joshua": 6, "Judges": 7, "Ruth": 8, "1 Samuel": 9, "2 Samuel": 10,
@@ -47,14 +47,14 @@ def load_csv_to_map(filename, target_map, lang_code=None, is_lexicon=False):
         return
     
     try:
-        # [수정] 1절 표시를 위해 헤더 무시하고 강제로 읽기
+        # [핵심 수정] 가장 강력한 1절 로직: 무조건 숫자로 변환 시도
         with open(path, 'r', encoding='utf-8-sig') as f:
             reader = csv.reader(f)
-            
             count = 0
+            
             for row in reader:
                 if not row: continue
-                
+
                 # 사전(Lexicon) 처리
                 if is_lexicon:
                     if len(row) >= 2:
@@ -62,29 +62,29 @@ def load_csv_to_map(filename, target_map, lang_code=None, is_lexicon=False):
                         count += 1
                     continue
 
-                # 성경 본문 처리 (Book, Chapter, Verse, Text)
+                # 성경 데이터 처리
                 if len(row) < 4: continue
                 
                 b, c, v, t = row[0], row[1], row[2], row[3]
 
-                # 첫 줄이 제목(Header)인 경우 건너뛰기 로직
-                # (숫자가 아니면 제목으로 간주하되, Genesis 같은 책 이름이면 데이터로 간주)
-                if not c.isdigit() or not v.isdigit():
-                    # 만약 첫 컬럼이 책 이름 목록에 있다면 이건 데이터다! (1절 복구 핵심)
-                    if b not in BOOK_TO_ID: 
-                        continue 
-
+                # [여기가 핵심] 장(c)과 절(v)이 숫자인지 확인합니다.
+                # 숫자라면 무조건 데이터로 취급합니다. (헤더일 가능성 배제)
                 try:
-                    key = f"{b}-{int(c)}-{int(v)}"
-                    target_map[key] = t
-                    count += 1
-                    
-                    if lang_code:
-                        search_index[lang_code].append({
-                            "book": b, "chapter": int(c), "verse": int(v), "text": t
-                        })
+                    chapter_int = int(c)
+                    verse_int = int(v)
                 except ValueError:
+                    # 숫자가 아니면(예: 'Chapter', 'Verse' 텍스트) 건너뜁니다.
                     continue
+
+                # 여기까지 오면 무조건 데이터입니다.
+                key = f"{b}-{chapter_int}-{verse_int}"
+                target_map[key] = t
+                count += 1
+                
+                if lang_code:
+                    search_index[lang_code].append({
+                        "book": b, "chapter": chapter_int, "verse": verse_int, "text": t
+                    })
 
         print(f"✅ {filename} 로드 완료: {count}건")
         
@@ -130,7 +130,7 @@ def init_db():
 with app.app_context():
     init_db()
 
-# [수정] 원전분해: 책 이름을 숫자로 변환하여 조회
+# 원전분해: 책 이름을 숫자로 변환하여 조회
 def get_analysis_from_sdb(book, chapter, verse):
     sdb_path = os.path.join(base_dir, '원전분해.sdb')
     
@@ -142,7 +142,7 @@ def get_analysis_from_sdb(book, chapter, verse):
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
 
-        # 1. 테이블 확인
+        # 테이블 확인
         cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
         tables = [row['name'] for row in cur.fetchall()]
         
@@ -151,26 +151,20 @@ def get_analysis_from_sdb(book, chapter, verse):
             conn.close()
             return {"error": f"DB 오류: '{target_table}' 테이블이 없습니다. 목록: {tables}"}
 
-        # 2. 책 이름(String) -> ID(Integer) 변환
-        # DB에는 Genesis 대신 1, Exodus 대신 2가 들어있을 확률이 99%입니다.
+        # ID 변환 및 쿼리
         book_id = BOOK_TO_ID.get(book)
         
         if not book_id:
-            # 매핑 실패 시 원본 문자열로라도 시도
             query = f"SELECT * FROM {target_table} WHERE book = ? AND chapter = ? AND verse = ?"
             cur.execute(query, (book, chapter, verse))
         else:
-            # ID로 조회 (book 컬럼이 숫자라고 가정)
             query = f"SELECT * FROM {target_table} WHERE book = ? AND chapter = ? AND verse = ?"
             cur.execute(query, (book_id, chapter, verse))
             
         rows = cur.fetchall()
-        
-        # 3. 결과 변환
         result = []
         for row in rows:
-            row_dict = dict(row)
-            result.append(row_dict)
+            result.append(dict(row))
             
         conn.close()
         return result
@@ -253,20 +247,16 @@ def save_commentary():
 def search_bible():
     query = request.args.get('q', '')
     lang = request.args.get('lang', 'kor')
-    
     if not query or len(query) < 2:
         return jsonify({"results": [], "message": "2글자 이상 입력"})
-    
     results = []
     count = 0
     target_data = search_index.get(lang, [])
-    
     for item in target_data:
         if query in item['text']:
             results.append(item)
             count += 1
             if count >= 100: break
-            
     return jsonify({"results": results, "count": count})
 
 if __name__ == '__main__':

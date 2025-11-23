@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AHP Bible Project</title>
     <link rel="stylesheet" href="style.css">
-    <!-- 깔끔한 아이콘 사용을 위한 구글 폰트 -->
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 </head>
 <body>
@@ -33,14 +32,10 @@
                 <button id="next-btn" class="nav-btn">다음 장 ▶</button>
             </div>
         </div>
-        <div class="design-group mobile-only-hide">
-            <button id="btn-dark-mode" class="icon-btn" title="다크 모드">🌗</button>
-            <button id="btn-font-plus" class="icon-btn" title="글자 확대">A+</button>
-            <button id="btn-font-minus" class="icon-btn" title="글자 축소">A-</button>
-        </div>
 
         <div class="nav-right-group">
-            <!-- 검색창 -->
+            <button id="btn-dark-mode" class="icon-btn" title="다크 모드">🌗</button>
+
             <div class="search-box">
                 <select id="search-lang">
                     <option value="kor" selected>한</option>
@@ -52,7 +47,6 @@
                 <button id="search-btn" class="nav-btn">🔍</button>
             </div>
             
-            <!-- [NEW] 모바일용 주해창 토글 버튼 -->
             <button id="toggle-commentary-btn" class="nav-trigger mobile-only">
                 <span class="material-icons" style="font-size:1.2rem; vertical-align:middle;">menu_book</span>
             </button>
@@ -60,18 +54,18 @@
     </div>
 
     <main class="container">
-        <!-- 왼쪽: 성경 본문 (헤더 삭제됨) -->
         <section id="bible-area">
             <div id="bible-list" class="scrollable-content"></div>
         </section>
 
-        <!-- 오른쪽: AHP 주해 (모바일에서는 팝업처럼 동작) -->
         <aside id="commentary-area">
             <div class="panel-header">
-                AHP 주해 (<span id="current-verse-display">1절</span>)
-                <!-- 모바일용 닫기 버튼 -->
-                <span id="close-commentary-btn" class="material-icons close-icon mobile-only">close</span>
-            </div>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span>AHP주해 (<span id="current-verse-display">1절</span>)</span>
+                    <button id="btn-font-plus" class="icon-btn-small" title="글자 확대">A+</button>
+                    <button id="btn-font-minus" class="icon-btn-small" title="글자 축소">A-</button>
+                </div>
+                </div>
             <div id="commentary-content-wrapper" class="scrollable-content">
                 <div id="commentary-display">절을 선택하면 주해가 표시됩니다.</div>
                 <button id="edit-btn" class="action-btn">주해 작성 / 수정</button>
@@ -86,7 +80,6 @@
         </aside>
     </main>
 
-    <!-- [NEW] 복사 선택 팝업 -->
     <div id="copy-modal" class="modal-overlay" style="display: none;">
         <div class="modal-content small-modal">
             <span id="copy-close" class="close-btn">&times;</span>
@@ -99,7 +92,6 @@
         </div>
     </div>
 
-    <!-- 기존 팝업들 -->
     <div id="lexicon-modal" class="modal-overlay" style="display: none;">
         <div class="modal-content">
             <span id="lexicon-close" class="close-btn">&times;</span>
@@ -111,7 +103,6 @@
     <div id="analysis-modal" class="modal-overlay" style="display: none;">
         <div class="modal-content">
             <span id="analysis-close" class="close-btn">&times;</span>
-            <h2>원전 분해</h2>
             <div id="analysis-body"></div>
         </div>
     </div>

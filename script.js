@@ -1,9 +1,8 @@
-// Render 서버 (배포 시 주석 해제)
+// Render 서버
 const AHPI_API_BASE_URL = "https://ahpi-bible-backend.onrender.com/api";
 // 로컬 테스트
 // const AHPI_API_BASE_URL = "http://127.0.0.1:5000/api";
 
-// --- 데이터 ---
 const BIBLE_DATA = {
     "Genesis": 50, "Exodus": 40, "Leviticus": 27, "Numbers": 36, "Deuteronomy": 34,
     "Joshua": 24, "Judges": 21, "Ruth": 4, "1 Samuel": 31, "2 Samuel": 24, "1 Kings": 22, "2 Kings": 25, "1 Chronicles": 29, "2 Chronicles": 36, "Ezra": 10, "Nehemiah": 13, "Esther": 10,
@@ -40,13 +39,12 @@ let historyStack = [];
 let historyIndex = -1;
 let isHistoryNavigating = false;
 let tempCopyData = { kor: "", eng: "", ori: "", verse: 0 };
-let currentFontSize = 100; // % 단위
+let currentFontSize = 100; // %
 
 document.addEventListener("DOMContentLoaded", function() {
     setupEventListeners();
     loadChapter(currentBook, currentChapter, true);
     
-    // 다크모드 설정 불러오기
     if(localStorage.getItem('theme') === 'dark') {
         document.body.classList.add('dark-mode');
     }
@@ -74,19 +72,19 @@ function setupEventListeners() {
     document.getElementById("cancel-btn").onclick = closeEditor;
     document.getElementById("save-btn").onclick = saveCommentary;
     document.getElementById("toggle-commentary-btn").onclick = toggleCommentary;
-    document.getElementById("close-commentary-btn").onclick = toggleCommentary;
+    
+    // 주해창 닫기 버튼 제거됨 (토글 버튼만 사용)
 
     document.getElementById("copy-kor").onclick = () => executeCopy('kor');
     document.getElementById("copy-eng").onclick = () => executeCopy('eng');
     document.getElementById("copy-ori").onclick = () => executeCopy('ori');
 
-    // [NEW] 디자인 컨트롤 이벤트
     document.getElementById("btn-dark-mode").onclick = toggleDarkMode;
+    // 폰트 조절 버튼 이벤트 연결 (index.html에서 id가 있어야 함)
     document.getElementById("btn-font-plus").onclick = () => changeFontSize(10);
     document.getElementById("btn-font-minus").onclick = () => changeFontSize(-10);
 }
 
-// --- 디자인 기능 ---
 function toggleDarkMode() {
     document.body.classList.toggle('dark-mode');
     localStorage.setItem('theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light');
@@ -97,20 +95,19 @@ function changeFontSize(delta) {
     if(currentFontSize < 70) currentFontSize = 70;
     if(currentFontSize > 200) currentFontSize = 200;
     
-    const bibleList = document.getElementById("bible-list");
-    bibleList.style.fontSize = `${currentFontSize}%`;
-    
-    // 주해 영역 폰트도 같이 조절
-    document.getElementById("commentary-display").style.fontSize = `${1.1 * (currentFontSize/100)}rem`;
+    // 주해창 폰트 조절 (본문은 그대로 두고 주해만 조절하려면 타겟 변경 가능)
+    // 여기서는 주해 디스플레이 영역에 직접 적용
+    const commDisplay = document.getElementById("commentary-display");
+    if(commDisplay) {
+        commDisplay.style.fontSize = `${1.1 * (currentFontSize/100)}rem`;
+    }
 }
 
-// --- 주해창 제어 ---
 function toggleCommentary() {
     const panel = document.getElementById("commentary-area");
     panel.classList.toggle("show");
 }
 
-// --- 복사 기능 ---
 function openCopyModal(kor, eng, ori, verse) {
     tempCopyData = { kor, eng, ori, verse };
     document.getElementById("copy-modal").style.display = "flex";
@@ -140,7 +137,6 @@ function executeCopy(lang) {
     });
 }
 
-// --- 데이터 로드 ---
 function loadChapter(book, chapter, pushToHistory = true) {
     currentBook = book;
     currentChapter = chapter;
@@ -189,9 +185,7 @@ async function fetchChapterData(book, chapter) {
 function renderBibleList(maxVerse) {
     const list = document.getElementById("bible-list");
     list.innerHTML = "";
-    // 폰트 크기 적용
-    list.style.fontSize = `${currentFontSize}%`;
-
+    
     if (maxVerse === 0) { list.innerHTML = "<p>본문이 없습니다.</p>"; return; }
 
     const isNT = NT_BOOKS.includes(currentBook);
@@ -261,7 +255,7 @@ function handleCommentaryClick(verseNum) {
     }
 }
 
-// [수정] 원전 분해: DB 컬럼을 몰라도 표시되도록 동적 처리
+// [핵심 변경] 원전 분해 UI: 테이블 삭제, 깔끔한 리스트 형태
 async function openAnalysisModal(book, chapter, verse) {
     const modal = document.getElementById("analysis-modal");
     const body = document.getElementById("analysis-body");
@@ -283,39 +277,40 @@ async function openAnalysisModal(book, chapter, verse) {
             return;
         }
 
-        // [동적 테이블 생성] 첫 번째 데이터의 키를 헤더로 사용
-        const columns = Object.keys(data[0]);
-        
-        let tableHtml = `
-            <div class="analysis-meta">${KOREAN_BOOK_NAMES[book] || book} ${chapter}:${verse}</div>
-            <div class="table-wrapper">
-            <table class="analysis-table">
-                <thead>
-                    <tr>
-                        ${columns.map(col => `<th>${col}</th>`).join('')}
-                    </tr>
-                </thead>
-                <tbody>
+        // 헤더: 한 줄로 깔끔하게
+        const bookName = KOREAN_BOOK_NAMES[book] || book;
+        let html = `
+            <div class="analysis-header-line">원전 분해 (${bookName} ${chapter}:${verse})</div>
+            <div class="analysis-list">
         `;
 
+        // 데이터 반복
         data.forEach(item => {
-            tableHtml += "<tr>";
-            columns.forEach(col => {
-                let val = item[col] || "";
-                // 스트롱 코드가 있으면 링크 처리 시도 (단순 로직)
-                if (col.toLowerCase().includes("strong") && val) {
-                    tableHtml += `<td><span class="strong-tag" onclick="openLexiconModal('${val}', '')">${val}</span></td>`;
-                } else if (col.toLowerCase().includes("word") || col.toLowerCase().includes("text")) {
-                     tableHtml += `<td class="origin-font">${val}</td>`;
-                } else {
-                    tableHtml += `<td>${val}</td>`;
+            // btext(혹은 다른 본문 컬럼)만 찾아서 표시
+            // 만약 item['btext']가 있으면 그걸 쓰고, 없으면 values를 다 뒤져서 긴 텍스트 찾기
+            let content = item['btext'] || item['text'] || "";
+            
+            // 만약 컬럼명을 정확히 모른다면, 관리용 컬럼 제외하고 표시
+            if (!content) {
+                const ignoreKeys = ['book', 'chapter', 'id', 'verse'];
+                for (const key in item) {
+                    if (!ignoreKeys.includes(key.toLowerCase())) {
+                        content = item[key];
+                        break; 
+                    }
                 }
-            });
-            tableHtml += "</tr>";
+            }
+
+            // HTML 태그가 있다면 그대로 렌더링 (innerHTML)
+            html += `
+                <div class="analysis-item">
+                    ${content}
+                </div>
+            `;
         });
 
-        tableHtml += `</tbody></table></div>`;
-        body.innerHTML = tableHtml;
+        html += `</div>`;
+        body.innerHTML = html;
 
     } catch (err) {
         console.error(err);
@@ -515,7 +510,6 @@ async function performSearch() {
     const res = await fetch(`${AHPI_API_BASE_URL}/search?q=${encodeURIComponent(q)}&lang=${lang}`);
     const data = await res.json();
     if(data.results?.length) {
-        // [수정] 검색 결과 UI 개선
         body.innerHTML = `<div style='margin-bottom:10px; font-weight:bold;'>총 ${data.count}건 발견</div>` + 
         data.results.map(item => 
             `<div class="search-item" onclick="window.goToSearchResult('${item.book}', ${item.chapter}, ${item.verse})">
