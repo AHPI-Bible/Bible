@@ -47,9 +47,7 @@ def load_csv_to_map(filename, target_map, lang_code=None, is_lexicon=False):
         return
     
     try:
-        # [1절 강제 표시 로직]
-        # 헤더(제목줄)를 건너뛰는 기본 동작을 무시하고,
-        # 장(Chapter)과 절(Verse)이 숫자로 변환되면 무조건 데이터로 읽습니다.
+        # [1절 보장 강화 로직]
         with open(path, 'r', encoding='utf-8-sig') as f:
             reader = csv.reader(f)
             count = 0
@@ -57,34 +55,46 @@ def load_csv_to_map(filename, target_map, lang_code=None, is_lexicon=False):
             for row in reader:
                 if not row: continue
 
-                # 사전(Lexicon) 처리
                 if is_lexicon:
                     if len(row) >= 2:
                         target_map[row[0]] = row[1]
                         count += 1
                     continue
 
-                # 성경 데이터 처리 (최소 4열)
                 if len(row) < 4: continue
                 
                 b, c, v, t = row[0], row[1], row[2], row[3]
 
+                # [핵심] 1절은 어떤 상황에서도 읽어들이도록 강제
+                is_valid = False
+                
+                # 1. 숫자로 변환 가능한지 체크
                 try:
-                    # 문자가 섞여있어도 숫자로 변환되면 데이터로 인정
                     c_int = int(c)
                     v_int = int(v)
+                    is_valid = True
                 except ValueError:
-                    # 숫자가 아니면(예: 'Chapter') 건너뜀
-                    continue
+                    # 2. 변환 실패 시, 만약 절(v)이 '1'이라는 문자라면 강제 인정
+                    if v.strip() == '1':
+                        # 장(Chapter)이 숫자가 아닐 수 있으니 1로 가정하거나 최대한 파싱 시도
+                        try:
+                            c_int = int(c) if c.isdigit() else 1
+                            v_int = 1
+                            is_valid = True
+                        except:
+                            is_valid = False
+                    else:
+                        is_valid = False
 
-                key = f"{b}-{c_int}-{v_int}"
-                target_map[key] = t
-                count += 1
-                
-                if lang_code:
-                    search_index[lang_code].append({
-                        "book": b, "chapter": c_int, "verse": v_int, "text": t
-                    })
+                if is_valid:
+                    key = f"{b}-{c_int}-{v_int}"
+                    target_map[key] = t
+                    count += 1
+                    
+                    if lang_code:
+                        search_index[lang_code].append({
+                            "book": b, "chapter": c_int, "verse": v_int, "text": t
+                        })
 
         print(f"✅ {filename} 로드 완료: {count}건")
         

@@ -67,6 +67,22 @@ h1 { margin: 0; font-size: 1.5rem; line-height: 1.2; }
 .nav-right-group { display: flex; align-items: center; gap: 10px; margin-left: auto; }
 .history-group, .book-group, .move-group { display: flex; align-items: center; gap: 5px; }
 
+/* 드롭다운 메뉴 */
+.dropdown-wrapper { position: relative; display: inline-block; }
+.dropdown-menu {
+    display: none; position: absolute; top: 100%; left: 0;
+    background: var(--card-bg); border: 1px solid var(--border-color);
+    border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    z-index: 3000; min-width: 80px;
+}
+.dropdown-menu.show { display: block; }
+.menu-item {
+    padding: 10px; cursor: pointer; color: var(--text-color);
+    text-align: center; border-bottom: 1px solid var(--hover-bg);
+}
+.menu-item:hover { background: var(--hover-bg); color: var(--primary-color); }
+.menu-item:last-child { border-bottom: none; }
+
 .icon-btn { background: none; border: none; cursor: pointer; font-size: 1.2rem; color: var(--text-sub); padding: 5px; }
 .icon-btn:hover { color: var(--primary-color); }
 
@@ -99,8 +115,8 @@ h1 { margin: 0; font-size: 1.5rem; line-height: 1.2; }
     scroll-padding-top: 60px; 
 }
 
-/* 좌측 원전 분해 패널 */
-#analysis-panel {
+/* 좌측 패널 공통 (원전분해, 사전) */
+#analysis-panel, #lexicon-panel {
     position: fixed; 
     top: 0; left: 0; bottom: 0;
     width: 85%; max-width: 400px;
@@ -112,31 +128,25 @@ h1 { margin: 0; font-size: 1.5rem; line-height: 1.2; }
     transition: transform 0.3s ease;
     box-shadow: 5px 0 15px rgba(0,0,0,0.2);
 }
-#analysis-panel.show { transform: translateX(0); }
+#analysis-panel.show, #lexicon-panel.show { transform: translateX(0); }
 
 /* 우측 주해창 */
 #commentary-area {
-    /* 기본값 (PC) */
-    width: 400px; 
-    background: var(--card-bg); 
-    border-left: 1px solid var(--border-color);
-    display: flex; flex-direction: column; 
-    flex-shrink: 0; 
-    transition: transform 0.3s ease, width 0.3s ease, flex 0.3s ease;
-    z-index: 900;
+    width: 400px; background: var(--card-bg); border-left: 1px solid var(--border-color);
+    display: flex; flex-direction: column; flex-shrink: 0; transition: transform 0.3s ease, width 0.3s ease, flex 0.3s ease; z-index: 900;
 }
 
-/* [NEW] 화면 비율 조정 클래스들 (PC 전용) */
+/* PC 화면 비율 클래스 */
 @media (min-width: 1025px) {
-    /* 50:50 */
+    body.layout-40-60 #bible-area { flex: 4; }
+    body.layout-40-60 #commentary-area { width: 60%; }
+
     body.layout-50-50 #bible-area { flex: 1; }
     body.layout-50-50 #commentary-area { width: 50%; }
 
-    /* 60:40 (기본에 가까움) */
     body.layout-60-40 #bible-area { flex: 6; }
     body.layout-60-40 #commentary-area { width: 40%; }
 
-    /* 70:30 */
     body.layout-70-30 #bible-area { flex: 7; }
     body.layout-70-30 #commentary-area { width: 30%; }
 }
@@ -207,18 +217,8 @@ textarea { width: 100%; height: 300px; padding: 10px; border: 1px solid var(--bo
 .large-modal { max-width: 800px; }
 .small-modal { max-width: 350px; }
 
-/* [NEW] Sticky Close Button for Lexicon */
 .close-btn { position: absolute; top: 10px; right: 15px; font-size: 24px; cursor: pointer; color: var(--text-sub); }
-.sticky-close {
-    position: sticky;
-    top: 0;
-    float: right;
-    background: var(--card-bg); /* 배경색을 줘서 투명하지 않게 */
-    border-radius: 50%;
-    padding: 2px 8px;
-    z-index: 100;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-}
+.sticky-close { position: sticky; top: 0; float: right; background: var(--card-bg); border-radius: 50%; padding: 2px 8px; z-index: 100; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
 .close-btn:hover { color: var(--text-color); }
 
 .search-item { padding: 15px; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: 0.2s; }
@@ -227,7 +227,6 @@ textarea { width: 100%; height: 300px; padding: 10px; border: 1px solid var(--bo
 .search-text { font-size: 1rem; line-height: 1.4; color: var(--text-color); }
 mark { background-color: #ffeeba; color: #333; padding: 0 2px; border-radius: 2px; }
 
-/* 원전 분해 스타일 */
 .analysis-header-line {
     font-size: 1.3rem; font-weight: bold; color: var(--text-color);
     margin-bottom: 5px; padding-bottom: 5px; border-bottom: 2px solid var(--primary-color);
@@ -235,7 +234,8 @@ mark { background-color: #ffeeba; color: #333; padding: 0 2px; border-radius: 2p
 .analysis-container { display: flex; flex-direction: column; gap: 8px; }
 .analysis-word-item { margin-bottom: 5px; line-height: 1.4; font-size: 1.05rem; }
 
-.orig-word { font-size: 1.3rem; font-family: serif; font-weight: bold; color: #00008B; }
+/* [수정] 원어: 폰트 확대(1.6rem), 진한 파란색 */
+.orig-word { font-size: 1.6rem; font-family: serif; font-weight: bold; color: #00008B; }
 .meaning-text { color: #e83e8c; font-weight: bold; }
 .grammar-arrow { color: #999; font-size: 0.9rem; margin-right: 5px; }
 

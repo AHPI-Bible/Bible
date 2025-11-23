@@ -18,7 +18,15 @@
 
     <div class="nav-container">
         <div class="nav-left-group">
-            <button id="btn-layout-toggle" class="nav-btn" style="background:#555; margin-right:5px;" title="좌우 비율 변경">화면비율</button>
+            <div class="dropdown-wrapper">
+                <button id="btn-layout-toggle" class="nav-btn" style="background:#555; margin-right:5px;" title="좌우 비율 변경">좌우비율 ▼</button>
+                <div id="layout-menu" class="dropdown-menu">
+                    <div class="menu-item" data-ratio="40-60">4:6</div>
+                    <div class="menu-item" data-ratio="50-50">5:5</div>
+                    <div class="menu-item" data-ratio="60-40">6:4</div>
+                    <div class="menu-item" data-ratio="70-30">7:3</div>
+                </div>
+            </div>
 
             <div class="history-group">
                 <button id="hist-back-btn" class="nav-btn" title="이전 기록">◀</button>
@@ -62,9 +70,15 @@
                 <span id="close-analysis-btn" class="material-icons close-icon" style="cursor:pointer;">close</span>
                 <span>원전 분해</span>
             </div>
-            <div id="analysis-content" class="scrollable-content">
-                <p style="padding:10px; color:#666;">원전 분해 아이콘을 클릭하면 이곳에 표시됩니다.</p>
+            <div id="analysis-content" class="scrollable-content"></div>
+        </aside>
+
+        <aside id="lexicon-panel">
+            <div class="panel-header" style="justify-content: flex-start; gap: 15px;">
+                <span id="close-lexicon-btn" class="material-icons close-icon" style="cursor:pointer;">close</span>
+                <span>원어 사전</span>
             </div>
+            <div id="lexicon-content" class="scrollable-content"></div>
         </aside>
 
         <section id="bible-area">
