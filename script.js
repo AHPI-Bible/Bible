@@ -1,8 +1,9 @@
-// Render 서버 주소 (배포 시 주석 해제)
+// Render 서버 (배포 시 주석 해제)
 const AHPI_API_BASE_URL = "https://ahpi-bible-backend.onrender.com/api";
-// 로컬 테스트용
+// 로컬 테스트
 // const AHPI_API_BASE_URL = "http://127.0.0.1:5000/api";
 
+// --- 데이터 ---
 const BIBLE_DATA = {
     "Genesis": 50, "Exodus": 40, "Leviticus": 27, "Numbers": 36, "Deuteronomy": 34,
     "Joshua": 24, "Judges": 21, "Ruth": 4, "1 Samuel": 31, "2 Samuel": 24, "1 Kings": 22, "2 Kings": 25, "1 Chronicles": 29, "2 Chronicles": 36, "Ezra": 10, "Nehemiah": 13, "Esther": 10,
@@ -39,10 +40,16 @@ let historyStack = [];
 let historyIndex = -1;
 let isHistoryNavigating = false;
 let tempCopyData = { kor: "", eng: "", ori: "", verse: 0 };
+let currentFontSize = 100; // % 단위
 
 document.addEventListener("DOMContentLoaded", function() {
     setupEventListeners();
     loadChapter(currentBook, currentChapter, true);
+    
+    // 다크모드 설정 불러오기
+    if(localStorage.getItem('theme') === 'dark') {
+        document.body.classList.add('dark-mode');
+    }
 });
 
 function setupEventListeners() {
@@ -66,20 +73,44 @@ function setupEventListeners() {
     document.getElementById("edit-btn").onclick = openEditor;
     document.getElementById("cancel-btn").onclick = closeEditor;
     document.getElementById("save-btn").onclick = saveCommentary;
-
     document.getElementById("toggle-commentary-btn").onclick = toggleCommentary;
     document.getElementById("close-commentary-btn").onclick = toggleCommentary;
 
     document.getElementById("copy-kor").onclick = () => executeCopy('kor');
     document.getElementById("copy-eng").onclick = () => executeCopy('eng');
     document.getElementById("copy-ori").onclick = () => executeCopy('ori');
+
+    // [NEW] 디자인 컨트롤 이벤트
+    document.getElementById("btn-dark-mode").onclick = toggleDarkMode;
+    document.getElementById("btn-font-plus").onclick = () => changeFontSize(10);
+    document.getElementById("btn-font-minus").onclick = () => changeFontSize(-10);
 }
 
+// --- 디자인 기능 ---
+function toggleDarkMode() {
+    document.body.classList.toggle('dark-mode');
+    localStorage.setItem('theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light');
+}
+
+function changeFontSize(delta) {
+    currentFontSize += delta;
+    if(currentFontSize < 70) currentFontSize = 70;
+    if(currentFontSize > 200) currentFontSize = 200;
+    
+    const bibleList = document.getElementById("bible-list");
+    bibleList.style.fontSize = `${currentFontSize}%`;
+    
+    // 주해 영역 폰트도 같이 조절
+    document.getElementById("commentary-display").style.fontSize = `${1.1 * (currentFontSize/100)}rem`;
+}
+
+// --- 주해창 제어 ---
 function toggleCommentary() {
     const panel = document.getElementById("commentary-area");
     panel.classList.toggle("show");
 }
 
+// --- 복사 기능 ---
 function openCopyModal(kor, eng, ori, verse) {
     tempCopyData = { kor, eng, ori, verse };
     document.getElementById("copy-modal").style.display = "flex";
@@ -109,6 +140,7 @@ function executeCopy(lang) {
     });
 }
 
+// --- 데이터 로드 ---
 function loadChapter(book, chapter, pushToHistory = true) {
     currentBook = book;
     currentChapter = chapter;
@@ -157,6 +189,9 @@ async function fetchChapterData(book, chapter) {
 function renderBibleList(maxVerse) {
     const list = document.getElementById("bible-list");
     list.innerHTML = "";
+    // 폰트 크기 적용
+    list.style.fontSize = `${currentFontSize}%`;
+
     if (maxVerse === 0) { list.innerHTML = "<p>본문이 없습니다.</p>"; return; }
 
     const isNT = NT_BOOKS.includes(currentBook);
@@ -226,7 +261,7 @@ function handleCommentaryClick(verseNum) {
     }
 }
 
-// [수정됨] 원전 분해 모달 (에러 시 테이블 목록 표시)
+// [수정] 원전 분해: DB 컬럼을 몰라도 표시되도록 동적 처리
 async function openAnalysisModal(book, chapter, verse) {
     const modal = document.getElementById("analysis-modal");
     const body = document.getElementById("analysis-body");
@@ -239,47 +274,47 @@ async function openAnalysisModal(book, chapter, verse) {
         const data = await res.json();
 
         if (data.error) {
-            // [중요] 에러 메시지에 테이블 목록이 포함되어 있으므로 그대로 보여줌
-            body.innerHTML = `<p style="color:red; font-weight:bold;">${data.error}</p>
-                              <p style="color:#666; margin-top:10px; font-size:0.9rem;">
-                                위 목록에 있는 테이블 이름으로 api.py의 SQL 쿼리를 수정해야 합니다.
-                              </p>`;
+            body.innerHTML = `<p style="color:red; font-weight:bold;">${data.error}</p>`;
             return;
         }
 
         if (data.length === 0) {
-            body.innerHTML = "<p>분해 데이터가 없습니다.</p>";
+            body.innerHTML = "<p>분해 데이터가 없습니다. (책 이름이 DB와 다를 수 있습니다)</p>";
             return;
         }
 
+        // [동적 테이블 생성] 첫 번째 데이터의 키를 헤더로 사용
+        const columns = Object.keys(data[0]);
+        
         let tableHtml = `
             <div class="analysis-meta">${KOREAN_BOOK_NAMES[book] || book} ${chapter}:${verse}</div>
+            <div class="table-wrapper">
             <table class="analysis-table">
                 <thead>
                     <tr>
-                        <th>원어</th>
-                        <th>발음</th>
-                        <th>분해(문법)</th>
-                        <th>의미</th>
-                        <th>코드</th>
+                        ${columns.map(col => `<th>${col}</th>`).join('')}
                     </tr>
                 </thead>
                 <tbody>
         `;
 
         data.forEach(item => {
-            tableHtml += `
-                <tr>
-                    <td class="origin-font">${item.word}</td>
-                    <td>${item.pron}</td>
-                    <td style="color:#e83e8c;">${item.grammar}</td>
-                    <td>${item.meaning}</td>
-                    <td><span class="strong-tag" onclick="openLexiconModal('${item.code}', '${item.word}')">${item.code}</span></td>
-                </tr>
-            `;
+            tableHtml += "<tr>";
+            columns.forEach(col => {
+                let val = item[col] || "";
+                // 스트롱 코드가 있으면 링크 처리 시도 (단순 로직)
+                if (col.toLowerCase().includes("strong") && val) {
+                    tableHtml += `<td><span class="strong-tag" onclick="openLexiconModal('${val}', '')">${val}</span></td>`;
+                } else if (col.toLowerCase().includes("word") || col.toLowerCase().includes("text")) {
+                     tableHtml += `<td class="origin-font">${val}</td>`;
+                } else {
+                    tableHtml += `<td>${val}</td>`;
+                }
+            });
+            tableHtml += "</tr>";
         });
 
-        tableHtml += `</tbody></table>`;
+        tableHtml += `</tbody></table></div>`;
         body.innerHTML = tableHtml;
 
     } catch (err) {
@@ -475,18 +510,20 @@ async function performSearch() {
     if(q.length<2) return alert("2글자 이상");
     const modal = document.getElementById("search-result-modal");
     const body = document.getElementById("search-results-body");
-    body.innerHTML = "검색 중...";
+    body.innerHTML = "<div style='text-align:center; padding:20px;'>검색 중...</div>";
     modal.style.display = "flex";
     const res = await fetch(`${AHPI_API_BASE_URL}/search?q=${encodeURIComponent(q)}&lang=${lang}`);
     const data = await res.json();
     if(data.results?.length) {
-        body.innerHTML = data.results.map(item => 
+        // [수정] 검색 결과 UI 개선
+        body.innerHTML = `<div style='margin-bottom:10px; font-weight:bold;'>총 ${data.count}건 발견</div>` + 
+        data.results.map(item => 
             `<div class="search-item" onclick="window.goToSearchResult('${item.book}', ${item.chapter}, ${item.verse})">
                 <div class="search-ref">${KOREAN_BOOK_NAMES[item.book] || item.book} ${item.chapter}:${item.verse}</div>
-                <div class="search-text" ${lang==='heb'?'dir="rtl"':''}>${item.text}</div>
+                <div class="search-text" ${lang==='heb'?'dir="rtl"':''}>${item.text.replace(new RegExp(q, "gi"), `<mark>${q}</mark>`)}</div>
             </div>`
         ).join("");
-    } else body.innerHTML = "결과 없음";
+    } else body.innerHTML = "<div style='text-align:center; padding:20px;'>결과 없음</div>";
 }
 window.goToSearchResult = function(b, c, v) {
     document.getElementById("search-result-modal").style.display = "none";
