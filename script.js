@@ -4,6 +4,7 @@
 // 로컬 테스트 (현재 사용 중)
 const AHPI_API_BASE_URL = "http://127.0.0.1:5000/api";
 
+// --- [1] Constant and State Variables ---
 const BIBLE_DATA = {
     "Genesis": 50, "Exodus": 40, "Leviticus": 27, "Numbers": 36, "Deuteronomy": 34,
     "Joshua": 24, "Judges": 21, "Ruth": 4, "1 Samuel": 31, "2 Samuel": 24, "1 Kings": 22, "2 Kings": 25, "1 Chronicles": 29, "2 Chronicles": 36, "Ezra": 10, "Nehemiah": 13, "Esther": 10,
@@ -55,10 +56,11 @@ let currentBibleFontSize = 100;
 let currentCommFontSize = 100;
 
 const layoutClasses = ["layout-40-60", "layout-50-50", "layout-60-40", "layout-70-30", "layout-100-0"];
+const BOOK_INFO = KOREAN_BOOK_NAMES;
 
 
 // ====================================================================
-// CORE UTILITY FUNCTIONS (Must be defined early to avoid ReferenceErrors)
+// CORE UTILITY FUNCTIONS (Placed early to avoid ReferenceErrors)
 // ====================================================================
 
 function goToNextChapter() {
@@ -92,11 +94,21 @@ function updateHistoryButtons() {
     document.getElementById("hist-back-btn").style.opacity = (historyIndex <= 0) ? "0.5" : "1";
     document.getElementById("hist-fwd-btn").style.opacity = (historyIndex >= historyStack.length - 1) ? "0.5" : "1";
 }
+function updateNavUI() {
+    document.getElementById("current-location").innerText = `${KOREAN_BOOK_NAMES[currentBook]} ${currentChapter}장`;
+    if (NT_BOOKS.includes(currentBook)) { document.getElementById("btn-nt").classList.add("active"); document.getElementById("btn-ot").classList.remove("active"); } 
+    else { document.getElementById("btn-ot").classList.add("active"); document.getElementById("btn-nt").classList.remove("active"); }
+}
+function showToast(msg) {
+    const toast = document.getElementById("toast-message");
+    toast.innerText = msg;
+    toast.classList.remove("hidden");
+    setTimeout(() => toast.classList.add("hidden"), 1000);
+}
 
 
 /**
  * 텍스트 내 스트롱 코드를 찾아 span 태그로 감싸주는 함수
- * 이 함수는 renderBibleList가 호출하기 때문에 상단에 배치합니다.
  */
 function renderTextWithStrongs(text, lang) {
     if (!text) return "";
@@ -116,7 +128,6 @@ function renderTextWithStrongs(text, lang) {
 
 /**
  * 원어 텍스트를 클릭 가능한 단어로 분리하는 함수
- * 이 함수는 renderBibleList가 호출하기 때문에 상단에 배치합니다.
  */
 function renderOriginalText(text) {
     const words = text.split(/\s+/).filter(w => w.length > 0);
@@ -132,8 +143,58 @@ function renderOriginalText(text) {
     return html;
 }
 
+
 // ====================================================================
-// INITIALIZATION AND EVENT BINDING
+// AUTHENTICATION AND UI LOGIC
+// ====================================================================
+
+function updateAuthorizationUI() {
+    const editBtn = document.getElementById("edit-btn");
+    const headerLoginBtn = document.getElementById("header-login-btn"); 
+    if (currentUser.grade >= GRADE_AUTHORIZATION.OPEN_COMMENTARY_WRITE) editBtn.style.display = 'block';
+    else editBtn.style.display = 'none';
+    if (headerLoginBtn) {
+        if (currentUser.isAuthenticated) headerLoginBtn.innerText = `${currentUser.displayName} (Grade ${currentUser.grade} / 로그아웃)`;
+        else headerLoginBtn.innerText = '로그인';
+    }
+}
+
+async function handleLogin() {
+    const username = document.getElementById("login-username").value;
+    const password = document.getElementById("login-password").value;
+    const msgElement = document.getElementById("login-message");
+    msgElement.innerText = "로그인 중...";
+    try {
+        const res = await fetch(`${AHPI_API_BASE_URL}/login`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ username, password })
+        });
+        const result = await res.json();
+        if (res.ok && result.is_authenticated) {
+            currentUser.isAuthenticated = true;
+            currentUser.id = result.user_id;
+            currentUser.grade = result.grade;
+            currentUser.displayName = result.display_name;
+            document.getElementById("login-modal").style.display = "none";
+            showToast(`로그인 성공! ${currentUser.displayName}님 환영합니다.`);
+            updateAuthorizationUI();
+        } else {
+            msgElement.innerText = result.message || "로그인 실패";
+        }
+    } catch (error) {
+        msgElement.innerText = "서버 통신 오류";
+        console.error("Login Error:", error);
+    }
+}
+
+function handleLogout() {
+    currentUser = { isAuthenticated: false, id: null, grade: 0, displayName: '비회원' };
+    showToast("로그아웃되었습니다.");
+    updateAuthorizationUI();
+}
+
+// ====================================================================
+// CORE DATA FETCHING AND RENDERING
 // ====================================================================
 
 document.addEventListener("DOMContentLoaded", function() {
@@ -144,89 +205,6 @@ document.addEventListener("DOMContentLoaded", function() {
     document.body.classList.add(savedLayout);
     updateAuthorizationUI();
 });
-
-function setupEventListeners() {
-    const closeModal = (id) => { document.getElementById(id).style.display = "none"; };
-    document.getElementById("nav-modal-close").onclick = () => closeModal("nav-modal");
-    document.getElementById("lexicon-close").onclick = () => closeModal("lexicon-modal");
-    document.getElementById("search-close").onclick = () => closeModal("search-result-modal");
-    document.getElementById("chapter-nav-close").onclick = () => closeModal("chapter-nav-modal");
-    document.getElementById("copy-close").onclick = () => closeModal("copy-modal");
-    document.getElementById("settings-close").onclick = () => closeModal("settings-modal");
-    
-    document.getElementById("login-modal-close").onclick = () => closeModal("login-modal");
-    document.getElementById("login-submit-btn").onclick = handleLogin;
-    const headerLoginBtn = document.getElementById("header-login-btn");
-    if (headerLoginBtn) {
-        headerLoginBtn.onclick = () => { 
-            if (currentUser.isAuthenticated) handleLogout();
-            else document.getElementById("login-modal").style.display = "flex";
-        };
-    }
-
-    document.getElementById("btn-ot").onclick = () => openBookGrid("OT");
-    document.getElementById("btn-nt").onclick = () => openBookGrid("NT");
-    document.getElementById("prev-btn").onclick = goToPrevChapter;
-    document.getElementById("next-btn").onclick = goToNextChapter;
-    document.getElementById("hist-back-btn").onclick = goHistoryBack;
-    document.getElementById("hist-fwd-btn").onclick = goHistoryForward;
-    document.getElementById("search-btn").onclick = performSearch;
-    document.getElementById("search-input").onkeypress = (e) => { if(e.key === 'Enter') performSearch(); };
-
-    document.getElementById("edit-btn").onclick = openEditor;
-    document.getElementById("cancel-btn").onclick = closeEditor;
-    document.getElementById("save-btn").onclick = saveCommentary;
-    document.getElementById("toggle-commentary-btn").onclick = toggleCommentary;
-
-    document.getElementById("btn-dark-mode").onclick = toggleDarkMode;
-    document.getElementById("btn-comm-font-plus").onclick = () => changeCommFontSize(10);
-    document.getElementById("btn-comm-font-minus").onclick = () => changeCommFontSize(-10);
-
-    document.getElementById("close-analysis-btn").onclick = closeAnalysisPanel;
-    document.getElementById("close-lexicon-btn").onclick = closeLexiconPanel;
-    document.getElementById("close-commentary-btn").onclick = () => {
-        if(window.innerWidth <= 768) toggleCommentary();
-        else applyLayout("layout-100-0");
-    };
-
-    document.getElementById("btn-layout-header").onclick = () => {
-        document.getElementById("layout-menu").classList.toggle("show");
-    };
-    document.querySelectorAll(".menu-item").forEach(item => {
-        item.onclick = (e) => {
-            const ratio = e.target.getAttribute("data-ratio");
-            applyLayout(`layout-${ratio}`);
-            document.getElementById("layout-menu").classList.remove("show");
-        };
-    });
-    window.onclick = (e) => {
-        if (!e.target.matches('#btn-layout-header') && !e.target.matches('#btn-layout-header img')) {
-            const menu = document.getElementById("layout-menu");
-            if (menu && menu.classList.contains('show')) menu.classList.remove('show');
-        }
-    };
-
-    document.getElementById("copy-kor").onclick = () => copyVerseRange("kor");
-    document.getElementById("copy-eng").onclick = () => copyVerseRange("eng");
-    document.getElementById("copy-ori").onclick = () => copyVerseRange("ori");
-    document.getElementById("kor-start").onchange = () => updateEndDropdown("kor");
-    document.getElementById("eng-start").onchange = () => updateEndDropdown("eng");
-    document.getElementById("ori-start").onchange = () => updateEndDropdown("ori");
-    document.getElementById("kor-end").onchange = () => copyVerseRange("kor");
-    document.getElementById("eng-end").onchange = () => copyVerseRange("eng");
-    document.getElementById("ori-end").onchange = () => copyVerseRange("ori");
-
-    document.getElementById("btn-settings").onclick = () => {
-        document.getElementById("settings-modal").style.display = "flex";
-    };
-    document.getElementById("chk-kor").onchange = () => toggleBibleVersionVisibility("kor");
-    document.getElementById("chk-eng").onchange = () => toggleBibleVersionVisibility("eng");
-    document.getElementById("chk-ori").onchange = () => toggleBibleVersionVisibility("ori");
-}
-
-// ====================================================================
-// CORE DATA FETCHING AND RENDERING
-// ====================================================================
 
 function loadChapter(book, chapter, pushToHistory = true) {
     currentBook = book;
@@ -323,137 +301,7 @@ function renderBibleList(maxVerse) {
     makeHebrewWordsClickable();
 }
 
-// --- [API, Navigation, Search, Editor and UI Logic] ---
-
-function updateAuthorizationUI() {
-    const editBtn = document.getElementById("edit-btn");
-    const headerLoginBtn = document.getElementById("header-login-btn"); 
-    if (currentUser.grade >= GRADE_AUTHORIZATION.OPEN_COMMENTARY_WRITE) editBtn.style.display = 'block';
-    else editBtn.style.display = 'none';
-    if (headerLoginBtn) {
-        if (currentUser.isAuthenticated) headerLoginBtn.innerText = `${currentUser.displayName} (Grade ${currentUser.grade} / 로그아웃)`;
-        else headerLoginBtn.innerText = '로그인';
-    }
-}
-
-async function handleLogin() {
-    const username = document.getElementById("login-username").value;
-    const password = document.getElementById("login-password").value;
-    const msgElement = document.getElementById("login-message");
-    msgElement.innerText = "로그인 중...";
-    try {
-        const res = await fetch(`${AHPI_API_BASE_URL}/login`, {
-            method: 'POST', headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ username, password })
-        });
-        const result = await res.json();
-        if (res.ok && result.is_authenticated) {
-            currentUser.isAuthenticated = true;
-            currentUser.id = result.user_id;
-            currentUser.grade = result.grade;
-            currentUser.displayName = result.display_name;
-            document.getElementById("login-modal").style.display = "none";
-            showToast(`로그인 성공! ${currentUser.displayName}님 환영합니다.`);
-            updateAuthorizationUI();
-        } else {
-            msgElement.innerText = result.message || "로그인 실패";
-        }
-    } catch (error) {
-        msgElement.innerText = "서버 통신 오류";
-        console.error("Login Error:", error);
-    }
-}
-
-function handleLogout() {
-    currentUser = { isAuthenticated: false, id: null, grade: 0, displayName: '비회원' };
-    showToast("로그아웃되었습니다.");
-    updateAuthorizationUI();
-}
-
-function setEditorMode(type) {
-    currentEditorMode = type;
-    const contentInput = document.getElementById("commentary-input");
-    const openBtn = document.getElementById("mode-open-btn");
-    const ahpiBtn = document.getElementById("mode-ahpi-btn");
-    if(openBtn) {
-        openBtn.style.fontWeight = type === 'open' ? 'bold' : 'normal';
-        openBtn.style.backgroundColor = type === 'open' ? '#ddd' : '#f9f9f9';
-    }
-    if(ahpiBtn) {
-        ahpiBtn.style.fontWeight = type === 'ahpi' ? 'bold' : 'normal';
-        ahpiBtn.style.backgroundColor = type === 'ahpi' ? '#ddd' : '#f9f9f9';
-    }
-    const content = (type === 'ahpi') 
-        ? (loadedChapterData.ahpiCommentaries[currentVerse] || "") 
-        : (loadedChapterData.openCommentaries[currentVerse] || "");
-    contentInput.value = content;
-}
-
-function openEditor() {
-    if (currentUser.grade < GRADE_AUTHORIZATION.OPEN_COMMENTARY_WRITE) {
-        showToast("작성 권한이 없습니다.");
-        return;
-    }
-    document.getElementById("commentary-display").style.display = "none";
-    document.getElementById("edit-btn").style.display = "none";
-    document.getElementById("editor-container").style.display = "block";
-    
-    const editorModeContainer = document.getElementById("editor-mode-select");
-    const isAhpiAuthor = currentUser.grade >= GRADE_AUTHORIZATION.AHPI_COMMENTARY_WRITE;
-    let initialType = 'open';
-    if (isAhpiAuthor) {
-        editorModeContainer.innerHTML = `
-            <button id="mode-open-btn" style="padding:5px 10px; cursor:pointer; border:1px solid #ccc;">Open 주해</button>
-            <button id="mode-ahpi-btn" style="padding:5px 10px; cursor:pointer; border:1px solid #ccc;">AHPI 공식 주해</button>
-        `;
-        document.getElementById("mode-open-btn").onclick = () => setEditorMode('open');
-        document.getElementById("mode-ahpi-btn").onclick = () => setEditorMode('ahpi');
-        if(loadedChapterData.ahpiCommentaries[currentVerse]) initialType = 'ahpi';
-    } else {
-        editorModeContainer.innerHTML = '<span style="font-size:0.9em; color:#666;">Open 주해 작성 모드</span>';
-    }
-    setEditorMode(initialType);
-}
-
-function closeEditor() {
-    document.getElementById("editor-container").style.display = "none";
-    document.getElementById("commentary-display").style.display = "block";
-    document.getElementById("edit-btn").style.display = "block";
-}
-
-async function saveCommentary() {
-    if (currentUser.grade < GRADE_AUTHORIZATION.OPEN_COMMENTARY_WRITE) {
-        alert("권한이 부족합니다.");
-        closeEditor();
-        return;
-    }
-    const content = document.getElementById("commentary-input").value;
-    const btn = document.getElementById("save-btn");
-    btn.innerText = "저장 중...";
-    const commentaryType = currentEditorMode; 
-    const res = await fetch(`${AHPI_API_BASE_URL}/save_commentary`, {
-        method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ book: currentBook, chapter: currentChapter, verse: currentVerse, content: content, commentary_type: commentaryType, user_id: currentUser.id })
-    });
-    if(res.ok) {
-        showToast("저장 완료");
-        if (commentaryType === 'ahpi') loadedChapterData.ahpiCommentaries[currentVerse] = content;
-        else loadedChapterData.openCommentaries[currentVerse] = content;
-    } else {
-        const errData = await res.json();
-        alert("저장 실패: " + (errData.error || "알 수 없는 오류"));
-    }
-    selectVerse(currentVerse);
-    const row = document.getElementById(`verse-row-${currentVerse}`);
-    if (row) {
-        const icon = row.querySelector('.comm-icon');
-        if (icon && (loadedChapterData.ahpiCommentaries[currentVerse] || loadedChapterData.openCommentaries[currentVerse])) {
-            icon.classList.add('has-content');
-        }
-    }
-    btn.innerText = "저장";
-    closeEditor();
-}
+// --- [API, Search, Layout and UI Utilities] ---
 
 function handleCommentaryClick(verseNum) {
     selectVerse(verseNum); 
@@ -517,6 +365,101 @@ function parseAnalysisText(text) {
         resultHtml += `<div class="analysis-word-item">${processed}</div>`;
     });
     return resultHtml;
+}
+
+function selectVerse(verseNum) {
+    currentVerse = verseNum;
+    document.querySelectorAll(".verse-item").forEach(el => el.classList.remove("selected"));
+    const targetRow = document.getElementById(`verse-row-${verseNum}`);
+    if (targetRow) { targetRow.classList.add("selected"); if(verseNum === 1) targetRow.scrollIntoView({ block: "center" }); }
+    document.getElementById("current-verse-display").innerText = `${KOREAN_BOOK_NAMES[currentBook]||currentBook} ${currentChapter}:${verseNum}`;
+
+    const commentaryDisplay = document.getElementById("commentary-display");
+    commentaryDisplay.innerHTML = ''; 
+
+    let hasContent = false;
+    if (loadedChapterData.ahpiCommentaries[verseNum]) {
+        commentaryDisplay.appendChild(renderCommentary(verseNum, loadedChapterData.ahpiCommentaries[verseNum], 'ahpi'));
+        hasContent = true;
+    }
+    if (loadedChapterData.openCommentaries[verseNum]) {
+        commentaryDisplay.appendChild(renderCommentary(verseNum, loadedChapterData.openCommentaries[verseNum], 'open'));
+        hasContent = true;
+    }
+    if (!hasContent) commentaryDisplay.innerHTML = "<p style='padding:10px;'>작성된 주해가 없습니다.</p>";
+    
+    closeEditor();
+}
+
+function renderCommentary(verseNum, content, type) {
+    const isAhpi = type === 'ahpi';
+    const color = isAhpi ? '#4a3875' : '#1f7b88'; 
+    const container = document.createElement('div');
+    container.className = `commentary-box ${isAhpi ? 'ahpi-commentary' : 'open-commentary'}`;
+    container.innerHTML = `<h4 style="color: ${color}; margin-bottom: 5px;">📖 ${verseNum}절 - ${isAhpi ? 'AHPI 공식 주해' : 'Open 주해 (회원)'}</h4><p>${content}</p>`;
+    return container;
+}
+
+async function performSearch() {
+    const q = document.getElementById("search-input").value;
+    const lang = document.getElementById("search-lang").value;
+    if(q.length<2) return alert("2글자 이상");
+    const modal = document.getElementById("search-result-modal");
+    const body = document.getElementById("search-results-body");
+    body.innerHTML = "<div style='text-align:center; padding:20px;'>검색 중...</div>";
+    modal.style.display = "flex";
+    const res = await fetch(`${AHPI_API_BASE_URL}/search?q=${encodeURIComponent(q)}&lang=${lang}`);
+    const data = await res.json();
+    if(data.results?.length) {
+        body.innerHTML = `<div style='margin-bottom:10px; font-weight:bold;'>총 ${data.count}건 발견</div>` + 
+        data.results.map(item => `<div class="search-item" onclick="window.goToSearchResult('${item.book}', ${item.chapter}, ${item.verse})"><div class="search-ref">${KOREAN_BOOK_NAMES[item.book] || item.book} ${item.chapter}:${item.verse}</div><div class="search-text" ${lang==='heb'?'dir="rtl"':''}>${item.text.replace(new RegExp(q, "gi"), `<mark>${q}</mark>`)}</div></div>`).join("");
+    } else body.innerHTML = "<div style='text-align:center; padding:20px;'>결과 없음</div>";
+}
+window.goToSearchResult = function(b, c, v) {
+    document.getElementById("search-result-modal").style.display = "none";
+    loadChapter(b, c, true);
+};
+
+function attachStrongClickEvents() {
+    document.querySelectorAll('.strong-word').forEach(span => {
+        span.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openLexiconModal(e.target.dataset.strong, e.target.innerText);
+        });
+    });
+}
+function makeHebrewWordsClickable() {
+    document.querySelectorAll('.hebrew-word').forEach(span => {
+        span.addEventListener('click', (e) => { e.stopPropagation(); });
+    });
+}
+
+async function openLexiconModal(code, word) {
+    if (window.innerWidth <= 1024) { loadLexiconToLeftPanel(code, word); return; }
+    const modal = document.getElementById("lexicon-modal");
+    modal.style.display = "flex"; 
+    document.getElementById("modal-body").innerHTML = `<p>사전 찾는 중: ${code}...</p>`;
+    await fetchAndRenderLexicon(code, word, document.getElementById("modal-body"));
+}
+
+async function loadLexiconToLeftPanel(code, word) {
+    const panel = document.getElementById("lexicon-panel");
+    panel.classList.add("show");
+    document.getElementById("lexicon-content").innerHTML = `<p style="padding:10px;">사전 찾는 중: ${code}...</p>`;
+    await fetchAndRenderLexicon(code, word, document.getElementById("lexicon-content"));
+}
+
+async function fetchAndRenderLexicon(code, word, targetElement) {
+    try {
+        const res = await fetch(`${AHPI_API_BASE_URL}/lexicon/${code}`);
+        const data = await res.json();
+        if (data.content && data.content !== "사전 데이터가 없습니다.") {
+            targetElement.innerHTML = `<div style="text-align:left; line-height:1.6; font-size:1rem; padding:10px;">${data.content.replace(/([^\s]+)\^/g, '<span class="lexicon-huge-word">$1</span>').replace(/\^/g, '')}</div>`;
+        } else {
+            let link = code.startsWith('H') ? `https://biblehub.com/hebrew/${code.substring(1)}.htm` : `https://biblehub.com/greek/${code.substring(1)}.htm`;
+            targetElement.innerHTML = `<p style="color:red; text-align:center; padding:10px;">사전 데이터 없음</p><div style="text-align:center; margin-top:15px;"><a href="${link}" target="_blank" style="padding:8px; background:#eee; border-radius:5px;">BibleHub에서 보기</a></div>`;
+        }
+    } catch (err) { targetElement.innerHTML = "<p style='padding:10px;'>통신 오류</p>"; }
 }
 
 // --- [General UI and Layout Utilities] ---
